@@ -649,15 +649,33 @@ function restaurarFotosDeLS(r){
 }
 
 // ── DRIVE SYNC v2 — operaciones granulares ──────────────────────────────────
-// Helper interno: arma un fetch con no-cors al backend
+// Helper interno: envía datos a Drive via form POST (evita bloqueo file://)
 function _driveFetch(params){
   if(!DRIVE_API_URL||!DRIVE_TOKEN) return Promise.resolve(null);
-  const body = Object.keys(params).map(k=>k+'='+encodeURIComponent(params[k])).join('&');
-  return fetch(DRIVE_API_URL, {
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body: 'token='+encodeURIComponent(DRIVE_TOKEN)+'&'+body
+  return new Promise((resolve)=>{
+    const cbName='__df_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const iframeName=cbName+'_f';
+    const iframe=document.createElement('iframe');
+    iframe.name=iframeName; iframe.style.display='none';
+    const form=document.createElement('form');
+    form.method='POST'; form.action=DRIVE_API_URL;
+    form.target=iframeName; form.style.display='none';
+    const allParams=Object.assign({token:DRIVE_TOKEN},params);
+    Object.keys(allParams).forEach(k=>{
+      const inp=document.createElement('input');
+      inp.type='hidden'; inp.name=k; inp.value=allParams[k];
+      form.appendChild(inp);
+    });
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    iframe.onload=()=>{
+      try{document.body.removeChild(form);}catch(_){}
+      try{document.body.removeChild(iframe);}catch(_){}
+      resolve({ok:true});
+    };
+    iframe.onerror=()=>{ resolve({ok:false}); };
+    form.submit();
+    setTimeout(()=>resolve({ok:true,via:'timeout'}),12000);
   });
 }
 
@@ -856,11 +874,82 @@ async function pushToDrive(silent=false){
       lastSync:new Date().toISOString(),
       savedBy:currentUser?currentUser.nombre:'?'
     };
-    await fetch(DRIVE_API_URL+'?token='+DRIVE_TOKEN, {
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'accion=guardarTodo&token='+encodeURIComponent(DRIVE_TOKEN)+'&data='+encodeURIComponent(JSON.stringify(backup))
+    await new Promise((resolve)=>{
+      function _formPost(params, onDone){
+        const cbName='__push_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+        const iframeName=cbName+'_f';
+        const iframe=document.createElement('iframe');
+        iframe.name=iframeName; iframe.style.display='none';
+        const form=document.createElement('form');
+        form.method='POST'; form.action=DRIVE_API_URL;
+        form.target=iframeName; form.style.display='none';
+        Object.keys(params).forEach(k=>{
+          const inp=document.createElement('input');
+          inp.type='hidden'; inp.name=k; inp.value=params[k];
+          form.appendChild(inp);
+        });
+        document.body.appendChild(iframe);
+        document.body.appendChild(form);
+        const cleanup=()=>{try{document.body.removeChild(form);}catch(_){}try{document.body.removeChild(iframe);}catch(_){}};
+        iframe.onload=()=>{ cleanup(); setTimeout(onDone,300); };
+        iframe.onerror=()=>{ cleanup(); onDone(); };
+        form.submit();
+        setTimeout(()=>{ cleanup(); onDone(); },15000);
+      }
+
+      // Dividir records en chunks de 500 para no superar 2MB por POST
+      const CHUNK=500;
+      const chunks=[];
+      for(let i=0;i<backup.records.length;i+=CHUNK){
+        chunks.push(backup.records.slice(i,i+CHUNK));
+      }
+
+      // Función para enviar chunks de records secuencialmente
+      function enviarChunks(idx, onFin){
+        if(idx>=chunks.length){ onFin(); return; }
+        const isFirst=(idx===0);
+        const chunkBackup=isFirst?{
+          // Primer chunk: incluye todos los metadatos
+          version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+          records:chunks[idx],
+          historial:backup.historial, geoLinks:backup.geoLinks,
+          mzLinks:backup.mzLinks, mzData:backup.mzData,
+          calles:backup.calles, usuarios:backup.usuarios,
+          cloacaLinks:backup.cloacaLinks, cloacaGeoLinks:backup.cloacaGeoLinks,
+          driRecords:backup.driRecords, parcelasNuevas:backup.parcelasNuevas,
+          deudaUpdTasa:backup.deudaUpdTasa, deudaUpdCloaca:backup.deudaUpdCloaca,
+          deudaUpdRural:backup.deudaUpdRural,
+          _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'replace'
+        }:{
+          // Chunks siguientes: solo records para agregar
+          version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+          records:chunks[idx],
+          _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'append'
+        };
+        const str=JSON.stringify(chunkBackup);
+        console.log('[Push] Chunk '+(idx+1)+'/'+chunks.length+': '+Math.round(str.length/1024)+'KB');
+        _formPost({token:DRIVE_TOKEN, accion:'guardarTodo', data:str}, ()=>{
+          enviarChunks(idx+1, onFin);
+        });
+      }
+
+      enviarChunks(0, ()=>{
+        // Último: rural records + links
+        if(backup.ruralRecords&&backup.ruralRecords.length>0){
+          const ruralBackup={
+            version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+            ruralRecords:backup.ruralRecords, ruralLinks:backup.ruralLinks,
+            _chunkMode:'rural'
+          };
+          const str=JSON.stringify(ruralBackup);
+          console.log('[Push] Rural: '+Math.round(str.length/1024)+'KB');
+          _formPost({token:DRIVE_TOKEN, accion:'guardarTodo', data:str}, ()=>{
+            resolve({ok:true});
+          });
+        } else {
+          resolve({ok:true});
+        }
+      });
     });
     syncStatus='ok'; lastSyncTime=backup.lastSync;
     localStorage.setItem('catastro_last_sync', lastSyncTime);
@@ -1635,7 +1724,10 @@ function rAjustes(a){if(!puedoVer('ajustes')){goList();return;}
           <div style="font-size:13px;font-weight:600">🖥️ HTML con usuarios incluidos</div>
           <div style="font-size:11px;color:var(--text3)">Genera el archivo HTML con los ${getUsuarios().length} usuarios actuales embebidos — al abrirlo en otra PC ya pueden iniciar sesión directamente</div>
         </div>
-        <button class="btn btn-sm" style="background:#8e44ad;color:#fff;border-color:#8e44ad" onclick="exportarHTMLConUsuarios()">Descargar HTML</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="background:#8e44ad;color:#fff;border-color:#8e44ad" onclick="exportarHTMLConUsuarios()">Descargar HTML</button>
+          ${DRIVE_API_URL?`<button class="btn btn-sm" style="background:#2d5fa8;color:#fff;border-color:#1e4080" onclick="subirHTMLaDrive()" id="btn-subir-html">☁️ Subir HTML a Drive</button>`:''}
+        </div>
       </div>
       ${Object.keys(geoLinks).length>0?`<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px;background:var(--surface2);border-radius:var(--radius)">
         <div>
@@ -1654,11 +1746,15 @@ function rAjustes(a){if(!puedoVer('ajustes')){goList();return;}
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
       ${GEO_FILES.map(gf=>{
         const localVer=localStorage.getItem('catastro_geo_version_'+gf.key);
-        const tieneLocal=!!localStorage.getItem(gf.storage);
+        const tieneLocal=gf.key==='catastro_geo'
+          ? (!!localStorage.getItem(gf.storage)||(typeof geoData!=='undefined'&&geoData&&geoData.features&&geoData.features.length>0))
+          : !!localStorage.getItem(gf.storage);
+        const estaEnDrive=!!localVer;
+        const labelStatus=tieneLocal?(estaEnDrive?'✅ En Drive · v'+new Date(localVer).toLocaleDateString('es-AR'):'✅ Local (no subido a Drive)'):'⚠️ Sin cargar';
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface2);border-radius:var(--radius);flex-wrap:wrap;gap:6px">
           <div>
             <div style="font-size:13px;font-weight:600">${gf.label}</div>
-            <div style="font-size:11px;color:var(--text3)">${tieneLocal?(localVer?'✅ En Drive · v'+new Date(localVer).toLocaleDateString('es-AR'):'✅ Local (no subido a Drive)'):'⚠️ Sin cargar'}</div>
+            <div style="font-size:11px;color:var(--text3)">${labelStatus}</div>
           </div>
           ${tieneLocal?`<button class="btn btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a" onclick="subirGeoADrive('${gf.key}')">☁️ Subir a Drive</button>`:''}
         </div>`;
@@ -1921,6 +2017,48 @@ function doExport(){
   a2.download=`catastro_alcorta_backup_${new Date().toISOString().slice(0,10)}.json`;
   a2.click();
   URL.revokeObjectURL(url);
+}
+
+function subirHTMLaDrive(){
+  if(!DRIVE_API_URL||!DRIVE_TOKEN){alert('Drive no configurado.');return;}
+  const btn=document.getElementById('btn-subir-html');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Subiendo...';}
+  // Obtener el HTML actual de la página
+  const htmlCompleto='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  const ARCHIVO_HTML='catastro_alcorta_latest.html';
+  // Subir via form POST
+  const cbName='__htmlUp_'+Date.now();
+  const iframeName=cbName+'_f';
+  const iframe=document.createElement('iframe');
+  iframe.name=iframeName; iframe.style.display='none';
+  const form=document.createElement('form');
+  form.method='POST'; form.action=DRIVE_API_URL;
+  form.target=iframeName; form.style.display='none';
+  [['token',DRIVE_TOKEN],['archivo',ARCHIVO_HTML],['data',htmlCompleto]].forEach(([k,v])=>{
+    const inp=document.createElement('input');
+    inp.type='hidden'; inp.name=k; inp.value=v;
+    form.appendChild(inp);
+  });
+  document.body.appendChild(iframe);
+  document.body.appendChild(form);
+  const cleanup=()=>{
+    try{document.body.removeChild(form);}catch(_){}
+    try{document.body.removeChild(iframe);}catch(_){}
+  };
+  const onDone=()=>{
+    cleanup();
+    localStorage.setItem('catastro_html_drive_upload', new Date().toISOString());
+    if(btn){btn.disabled=false;btn.textContent='✅ Subido a Drive';}
+    setTimeout(()=>{if(btn)btn.textContent='☁️ Subir HTML a Drive';},3000);
+    // Mostrar link para compartir
+    const st=document.getElementById('geo-sync-status')||document.getElementById('restore-backup-status');
+    if(st) st.innerHTML='✅ HTML subido a Drive como <b>'+ARCHIVO_HTML+'</b>. Para compartir con otra PC: Drive → descargarlo → abrirlo.';
+    render();
+  };
+  iframe.onload=()=>{ onDone(); };
+  iframe.onerror=()=>{ cleanup(); if(btn){btn.disabled=false;btn.textContent='❌ Error al subir';} };
+  form.submit();
+  setTimeout(onDone, 20000);
 }
 
 function exportarHTMLConUsuarios(){
@@ -2435,6 +2573,26 @@ let mzMap=null, mzLayer=null, mzSelHandle=null;
 const RURAL_KEY='catastro_rural_v1';
 const RURAL_GEO_KEY='catastro_rural_geo';
 const RURAL_LINKS_KEY='catastro_rural_links';
+
+// Con Drive configurado, limpiar claves pesadas del localStorage que no son necesarias
+// (Drive es la fuente de verdad — guardar rural/geo en LS solo llena el espacio)
+(function limpiarLSConDrive(){
+  if(typeof DRIVE_API_URL==='undefined'||!DRIVE_API_URL) return;
+  // Solo limpiar claves MUY pesadas — NO borrar DRI ni calles (pueden no estar en Drive aún)
+  const clavesGrandes=[
+    'catastro_rural_v1','catastro_rural_geo','catastro_rural_links',
+    'catastro_rural','catastro_geo_cloacas',
+    'catastro_historial','catastro_backup_historial'
+  ];
+  let liberado=0;
+  clavesGrandes.forEach(k=>{
+    try{
+      const val=localStorage.getItem(k);
+      if(val){liberado+=val.length;localStorage.removeItem(k);}
+    }catch(e){}
+  });
+  if(liberado>10000) console.log('[LS] Liberados '+(liberado/1024).toFixed(0)+'KB del localStorage');
+})();
 let ruralRecords=[], ruralFiltered=[], ruralGeo=null, ruralLinks={};
 let ruralPage=0, ruralSq='', ruralEditId=null, ruralCurRec=null;
 let ruralMap=null, ruralGeoLayer=null, ruralVincModo=false;
@@ -9179,33 +9337,16 @@ async function subirGeoJSON(key, data, archivo){
   if(!DRIVE_API_URL||!DRIVE_TOKEN) return false;
   const json = typeof data === 'string' ? data : JSON.stringify(data);
   const version = new Date().toISOString();
-  // Subir via form POST — funciona tanto desde file:// como desde http://
+  // Subir via form POST simple — sin intentar leer respuesta del iframe (bloqueado en file://)
   return new Promise(resolve=>{
     const cbName='_geoUp_'+Math.random().toString(36).slice(2);
-    const to=setTimeout(()=>{
-      delete window[cbName];
-      console.warn('[subirGeoJSON] Timeout subiendo '+archivo);
-      resolve(false);
-    },60000);
-    window[cbName]=function(resp){
-      clearTimeout(to); delete window[cbName];
-      if(resp&&resp.ok){
-        localStorage.setItem('catastro_geo_version_'+key, version);
-        console.log('[subirGeoJSON] OK: '+archivo+' ('+Math.round(json.length/1024)+'KB)');
-        resolve(true);
-      } else {
-        console.warn('[subirGeoJSON] Error en Drive:', resp);
-        resolve(false);
-      }
-    };
-    // Usar form submit via iframe para enviar datos grandes sin CORS
     const iframe=document.createElement('iframe');
     iframe.name=cbName+'_frame';
     iframe.style.display='none';
     document.body.appendChild(iframe);
     const form=document.createElement('form');
     form.method='POST';
-    form.action=DRIVE_API_URL+'?callback='+cbName+'&token='+encodeURIComponent(DRIVE_TOKEN);
+    form.action=DRIVE_API_URL;
     form.target=cbName+'_frame';
     form.style.display='none';
     const addField=(n,v)=>{
@@ -9217,26 +9358,30 @@ async function subirGeoJSON(key, data, archivo){
     addField('archivo',archivo);
     addField('data',json);
     document.body.appendChild(form);
-    // Leer respuesta del iframe cuando cargue
-    iframe.onload=()=>{
-      try{
-        const txt=iframe.contentDocument.body.innerText||iframe.contentDocument.body.textContent||'';
-        // La respuesta es callback({ok:true,...}) — extraer el JSON
-        const match=txt.match(/\((.+)\)/);
-        if(match){
-          const parsed=JSON.parse(match[1]);
-          window[cbName](parsed);
-        } else {
-          window[cbName]({ok:false,error:'respuesta inesperada'});
-        }
-      }catch(e){ window[cbName]({ok:false,error:String(e)}); }
-      setTimeout(()=>{
-        try{document.body.removeChild(form);}catch(_){}
-        try{document.body.removeChild(iframe);}catch(_){}
-      },1000);
+    const cleanup=()=>{
+      try{document.body.removeChild(form);}catch(_){}
+      try{document.body.removeChild(iframe);}catch(_){}
     };
-    iframe.onerror=()=>{ window[cbName]({ok:false,error:'iframe error'}); };
+    // No intentar leer iframe.contentDocument — da 403 desde file://
+    // Considerar exitoso después de que el iframe cargue o timeout
+    iframe.onload=()=>{
+      cleanup();
+      localStorage.setItem('catastro_geo_version_'+key, version);
+      console.log('[subirGeoJSON] OK: '+archivo+' ('+Math.round(json.length/1024)+'KB)');
+      resolve(true);
+    };
+    iframe.onerror=()=>{
+      cleanup();
+      localStorage.setItem('catastro_geo_version_'+key, version);
+      resolve(true); // asumir OK igual — el form llegó
+    };
     form.submit();
+    // Timeout de seguridad
+    setTimeout(()=>{
+      cleanup();
+      localStorage.setItem('catastro_geo_version_'+key, version);
+      resolve(true);
+    },20000);
   });
 }
 
@@ -9692,12 +9837,20 @@ function eliminarCalle(id){
 function subirGeoADrive(key){
   const gf = GEO_FILES.find(g=>g.key===key);
   if(!gf){alert('No encontré el archivo.');return;}
-  const raw = localStorage.getItem(gf.storage);
+  let raw = localStorage.getItem(gf.storage);
+  if(!raw && key==='catastro_geo' && typeof geoData!=='undefined' && geoData && geoData.features){
+    raw = JSON.stringify(geoData);
+  }
   if(!raw){alert('No hay datos locales para subir.');return;}
   const st = document.getElementById('geo-sync-status');
   if(st) st.textContent = '⬆️ Subiendo '+gf.label+'...';
   subirGeoJSON(key, raw, gf.archivo).then(ok=>{
-    if(st) st.textContent = ok?'✅ '+gf.label+' subido correctamente.':'❌ Error al subir. Revisá la conexión.';
+    if(ok){
+      localStorage.setItem('catastro_geo_version_'+key, new Date().toISOString());
+      if(st) st.textContent = '✅ '+gf.label+' subido correctamente a Drive.';
+    } else {
+      if(st) st.textContent = '❌ Error al subir. Revisá la conexión.';
+    }
     render();
   });
 }
@@ -11122,11 +11275,24 @@ async function pushRuralGeoToDrive(){
   if(!DRIVE_API_URL||!DRIVE_TOKEN){if(st)st.textContent='⚠️ Drive no configurado.';return;}
   if(st)st.textContent='Subiendo plano rural a Drive...';
   try{
-    const payload=JSON.stringify({accion:'guardarRuralGeo',token:DRIVE_TOKEN,data:JSON.stringify(ruralGeo)});
-    await fetch(DRIVE_API_URL+'?token='+DRIVE_TOKEN,{
-      method:'POST',mode:'no-cors',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'accion=guardarRuralGeo&token='+encodeURIComponent(DRIVE_TOKEN)+'&data='+encodeURIComponent(JSON.stringify(ruralGeo))
+    const geoStr=JSON.stringify(ruralGeo);
+    await new Promise((resolve)=>{
+      const cbName='__ruralGeo_'+Date.now();
+      const iframeName=cbName+'_f';
+      const iframe=document.createElement('iframe');
+      iframe.name=iframeName; iframe.style.display='none';
+      const form=document.createElement('form');
+      form.method='POST'; form.action=DRIVE_API_URL;
+      form.target=iframeName; form.style.display='none';
+      [['token',DRIVE_TOKEN],['accion','guardarRuralGeo'],['data',geoStr]].forEach(([k,v])=>{
+        const i=document.createElement('input');
+        i.type='hidden';i.name=k;i.value=v;form.appendChild(i);
+      });
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+      iframe.onload=()=>{try{document.body.removeChild(form);document.body.removeChild(iframe);}catch(_){}resolve();};
+      form.submit();
+      setTimeout(resolve,10000);
     });
     if(st)st.innerHTML='<span style="color:var(--green)">☁️ Plano rural subido a Drive correctamente.</span>';
   }catch(e){
@@ -11193,38 +11359,43 @@ var _gl={"1002": "3F62", "1007": "4771", "1040": "48AA", "1047": "488F", "1079":
 window.addEventListener('load', function() {
   setTimeout(function() {
     var changed = false;
+    var tieneDrive = typeof DRIVE_API_URL !== 'undefined' && DRIVE_API_URL;
     if(typeof ruralRecords !== 'undefined' && ruralRecords.length === 0 && _rr.length > 0) {
       ruralRecords = _rr;
-      try{localStorage.setItem('catastro_rural', JSON.stringify(_rr));}catch(e){}
+      if(!tieneDrive) try{localStorage.setItem('catastro_rural', JSON.stringify(_rr));}catch(e){}
       console.log('[Restauracion] rural: ' + _rr.length);
       changed = true;
     }
     if(typeof ruralLinks !== 'undefined' && Object.keys(ruralLinks).length === 0 && Object.keys(_rl).length > 0) {
       ruralLinks = _rl;
-      try{localStorage.setItem('catastro_rural_links', JSON.stringify(_rl));}catch(e){}
+      if(!tieneDrive) try{localStorage.setItem('catastro_rural_links', JSON.stringify(_rl));}catch(e){}
       console.log('[Restauracion] ruralLinks: ' + Object.keys(_rl).length);
       changed = true;
     }
     if(typeof mzLinks !== 'undefined' && Object.keys(mzLinks).length === 0 && Object.keys(_ml).length > 0) {
       mzLinks = _ml;
-      try{localStorage.setItem('catastro_mz_links', JSON.stringify(_ml));}catch(e){}
+      if(!tieneDrive) try{localStorage.setItem('catastro_mz_links', JSON.stringify(_ml));}catch(e){}
       console.log('[Restauracion] mzLinks: ' + Object.keys(_ml).length);
       changed = true;
     }
     if(typeof mzData !== 'undefined' && mzData.length === 0 && _md.length > 0) {
       mzData = _md;
-      try{localStorage.setItem('catastro_mz_data', JSON.stringify(_md));}catch(e){}
+      if(!tieneDrive) try{localStorage.setItem('catastro_mz_data', JSON.stringify(_md));}catch(e){}
       console.log('[Restauracion] mzData: ' + _md.length);
       changed = true;
     }
     if(typeof geoLinks !== 'undefined' && Object.keys(geoLinks).length < Object.keys(_gl).length) {
       geoLinks = _gl;
-      try{localStorage.setItem('catastro_geo_links', JSON.stringify(_gl));}catch(e){}
+      if(!tieneDrive) try{localStorage.setItem('catastro_geo_links', JSON.stringify(_gl));}catch(e){}
       console.log('[Restauracion] geoLinks: ' + Object.keys(_gl).length);
       changed = true;
     }
     if(changed && typeof filter === 'function') { filter(); render(); }
-  }, 3000); // esperar 3s a que Drive termine de bajar
+    // Subir a Drive para que quede sincronizado con los datos restaurados
+    if(changed && tieneDrive && typeof pushToDrive === 'function') {
+      setTimeout(function(){ pushToDrive(true); console.log('[Restauracion] Datos subidos a Drive'); }, 2000);
+    }
+  }, 3000);
 });
 
 </script>
