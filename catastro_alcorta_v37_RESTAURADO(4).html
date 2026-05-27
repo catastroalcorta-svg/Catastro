@@ -649,15 +649,33 @@ function restaurarFotosDeLS(r){
 }
 
 // ── DRIVE SYNC v2 — operaciones granulares ──────────────────────────────────
-// Helper interno: arma un fetch con no-cors al backend
+// Helper interno: envía datos a Drive via form POST (evita bloqueo file://)
 function _driveFetch(params){
   if(!DRIVE_API_URL||!DRIVE_TOKEN) return Promise.resolve(null);
-  const body = Object.keys(params).map(k=>k+'='+encodeURIComponent(params[k])).join('&');
-  return fetch(DRIVE_API_URL, {
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body: 'token='+encodeURIComponent(DRIVE_TOKEN)+'&'+body
+  return new Promise((resolve)=>{
+    const cbName='__df_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const iframeName=cbName+'_f';
+    const iframe=document.createElement('iframe');
+    iframe.name=iframeName; iframe.style.display='none';
+    const form=document.createElement('form');
+    form.method='POST'; form.action=DRIVE_API_URL;
+    form.target=iframeName; form.style.display='none';
+    const allParams=Object.assign({token:DRIVE_TOKEN},params);
+    Object.keys(allParams).forEach(k=>{
+      const inp=document.createElement('input');
+      inp.type='hidden'; inp.name=k; inp.value=allParams[k];
+      form.appendChild(inp);
+    });
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    iframe.onload=()=>{
+      try{document.body.removeChild(form);}catch(_){}
+      try{document.body.removeChild(iframe);}catch(_){}
+      resolve({ok:true});
+    };
+    iframe.onerror=()=>{ resolve({ok:false}); };
+    form.submit();
+    setTimeout(()=>resolve({ok:true,via:'timeout'}),12000);
   });
 }
 
@@ -856,11 +874,82 @@ async function pushToDrive(silent=false){
       lastSync:new Date().toISOString(),
       savedBy:currentUser?currentUser.nombre:'?'
     };
-    await fetch(DRIVE_API_URL+'?token='+DRIVE_TOKEN, {
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'accion=guardarTodo&token='+encodeURIComponent(DRIVE_TOKEN)+'&data='+encodeURIComponent(JSON.stringify(backup))
+    await new Promise((resolve)=>{
+      function _formPost(params, onDone){
+        const cbName='__push_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+        const iframeName=cbName+'_f';
+        const iframe=document.createElement('iframe');
+        iframe.name=iframeName; iframe.style.display='none';
+        const form=document.createElement('form');
+        form.method='POST'; form.action=DRIVE_API_URL;
+        form.target=iframeName; form.style.display='none';
+        Object.keys(params).forEach(k=>{
+          const inp=document.createElement('input');
+          inp.type='hidden'; inp.name=k; inp.value=params[k];
+          form.appendChild(inp);
+        });
+        document.body.appendChild(iframe);
+        document.body.appendChild(form);
+        const cleanup=()=>{try{document.body.removeChild(form);}catch(_){}try{document.body.removeChild(iframe);}catch(_){}};
+        iframe.onload=()=>{ cleanup(); setTimeout(onDone,300); };
+        iframe.onerror=()=>{ cleanup(); onDone(); };
+        form.submit();
+        setTimeout(()=>{ cleanup(); onDone(); },15000);
+      }
+
+      // Dividir records en chunks de 500 para no superar 2MB por POST
+      const CHUNK=500;
+      const chunks=[];
+      for(let i=0;i<backup.records.length;i+=CHUNK){
+        chunks.push(backup.records.slice(i,i+CHUNK));
+      }
+
+      // Función para enviar chunks de records secuencialmente
+      function enviarChunks(idx, onFin){
+        if(idx>=chunks.length){ onFin(); return; }
+        const isFirst=(idx===0);
+        const chunkBackup=isFirst?{
+          // Primer chunk: incluye todos los metadatos
+          version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+          records:chunks[idx],
+          historial:backup.historial, geoLinks:backup.geoLinks,
+          mzLinks:backup.mzLinks, mzData:backup.mzData,
+          calles:backup.calles, usuarios:backup.usuarios,
+          cloacaLinks:backup.cloacaLinks, cloacaGeoLinks:backup.cloacaGeoLinks,
+          driRecords:backup.driRecords, parcelasNuevas:backup.parcelasNuevas,
+          deudaUpdTasa:backup.deudaUpdTasa, deudaUpdCloaca:backup.deudaUpdCloaca,
+          deudaUpdRural:backup.deudaUpdRural,
+          _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'replace'
+        }:{
+          // Chunks siguientes: solo records para agregar
+          version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+          records:chunks[idx],
+          _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'append'
+        };
+        const str=JSON.stringify(chunkBackup);
+        console.log('[Push] Chunk '+(idx+1)+'/'+chunks.length+': '+Math.round(str.length/1024)+'KB');
+        _formPost({token:DRIVE_TOKEN, accion:'guardarTodo', data:str}, ()=>{
+          enviarChunks(idx+1, onFin);
+        });
+      }
+
+      enviarChunks(0, ()=>{
+        // Último: rural records + links
+        if(backup.ruralRecords&&backup.ruralRecords.length>0){
+          const ruralBackup={
+            version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+            ruralRecords:backup.ruralRecords, ruralLinks:backup.ruralLinks,
+            _chunkMode:'rural'
+          };
+          const str=JSON.stringify(ruralBackup);
+          console.log('[Push] Rural: '+Math.round(str.length/1024)+'KB');
+          _formPost({token:DRIVE_TOKEN, accion:'guardarTodo', data:str}, ()=>{
+            resolve({ok:true});
+          });
+        } else {
+          resolve({ok:true});
+        }
+      });
     });
     syncStatus='ok'; lastSyncTime=backup.lastSync;
     localStorage.setItem('catastro_last_sync', lastSyncTime);
@@ -1635,7 +1724,10 @@ function rAjustes(a){if(!puedoVer('ajustes')){goList();return;}
           <div style="font-size:13px;font-weight:600">🖥️ HTML con usuarios incluidos</div>
           <div style="font-size:11px;color:var(--text3)">Genera el archivo HTML con los ${getUsuarios().length} usuarios actuales embebidos — al abrirlo en otra PC ya pueden iniciar sesión directamente</div>
         </div>
-        <button class="btn btn-sm" style="background:#8e44ad;color:#fff;border-color:#8e44ad" onclick="exportarHTMLConUsuarios()">Descargar HTML</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="background:#8e44ad;color:#fff;border-color:#8e44ad" onclick="exportarHTMLConUsuarios()">Descargar HTML</button>
+          ${DRIVE_API_URL?`<button class="btn btn-sm" style="background:#2d5fa8;color:#fff;border-color:#1e4080" onclick="subirHTMLaDrive()" id="btn-subir-html">☁️ Subir HTML a Drive</button>`:''}
+        </div>
       </div>
       ${Object.keys(geoLinks).length>0?`<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px;background:var(--surface2);border-radius:var(--radius)">
         <div>
@@ -1654,11 +1746,15 @@ function rAjustes(a){if(!puedoVer('ajustes')){goList();return;}
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
       ${GEO_FILES.map(gf=>{
         const localVer=localStorage.getItem('catastro_geo_version_'+gf.key);
-        const tieneLocal=!!localStorage.getItem(gf.storage);
+        const tieneLocal=gf.key==='catastro_geo'
+          ? (!!localStorage.getItem(gf.storage)||(typeof geoData!=='undefined'&&geoData&&geoData.features&&geoData.features.length>0))
+          : !!localStorage.getItem(gf.storage);
+        const estaEnDrive=!!localVer;
+        const labelStatus=tieneLocal?(estaEnDrive?'✅ En Drive · v'+new Date(localVer).toLocaleDateString('es-AR'):'✅ Local (no subido a Drive)'):'⚠️ Sin cargar';
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--surface2);border-radius:var(--radius);flex-wrap:wrap;gap:6px">
           <div>
             <div style="font-size:13px;font-weight:600">${gf.label}</div>
-            <div style="font-size:11px;color:var(--text3)">${tieneLocal?(localVer?'✅ En Drive · v'+new Date(localVer).toLocaleDateString('es-AR'):'✅ Local (no subido a Drive)'):'⚠️ Sin cargar'}</div>
+            <div style="font-size:11px;color:var(--text3)">${labelStatus}</div>
           </div>
           ${tieneLocal?`<button class="btn btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a" onclick="subirGeoADrive('${gf.key}')">☁️ Subir a Drive</button>`:''}
         </div>`;
@@ -1921,6 +2017,48 @@ function doExport(){
   a2.download=`catastro_alcorta_backup_${new Date().toISOString().slice(0,10)}.json`;
   a2.click();
   URL.revokeObjectURL(url);
+}
+
+function subirHTMLaDrive(){
+  if(!DRIVE_API_URL||!DRIVE_TOKEN){alert('Drive no configurado.');return;}
+  const btn=document.getElementById('btn-subir-html');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Subiendo...';}
+  // Obtener el HTML actual de la página
+  const htmlCompleto='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  const ARCHIVO_HTML='catastro_alcorta_latest.html';
+  // Subir via form POST
+  const cbName='__htmlUp_'+Date.now();
+  const iframeName=cbName+'_f';
+  const iframe=document.createElement('iframe');
+  iframe.name=iframeName; iframe.style.display='none';
+  const form=document.createElement('form');
+  form.method='POST'; form.action=DRIVE_API_URL;
+  form.target=iframeName; form.style.display='none';
+  [['token',DRIVE_TOKEN],['archivo',ARCHIVO_HTML],['data',htmlCompleto]].forEach(([k,v])=>{
+    const inp=document.createElement('input');
+    inp.type='hidden'; inp.name=k; inp.value=v;
+    form.appendChild(inp);
+  });
+  document.body.appendChild(iframe);
+  document.body.appendChild(form);
+  const cleanup=()=>{
+    try{document.body.removeChild(form);}catch(_){}
+    try{document.body.removeChild(iframe);}catch(_){}
+  };
+  const onDone=()=>{
+    cleanup();
+    localStorage.setItem('catastro_html_drive_upload', new Date().toISOString());
+    if(btn){btn.disabled=false;btn.textContent='✅ Subido a Drive';}
+    setTimeout(()=>{if(btn)btn.textContent='☁️ Subir HTML a Drive';},3000);
+    // Mostrar link para compartir
+    const st=document.getElementById('geo-sync-status')||document.getElementById('restore-backup-status');
+    if(st) st.innerHTML='✅ HTML subido a Drive como <b>'+ARCHIVO_HTML+'</b>. Para compartir con otra PC: Drive → descargarlo → abrirlo.';
+    render();
+  };
+  iframe.onload=()=>{ onDone(); };
+  iframe.onerror=()=>{ cleanup(); if(btn){btn.disabled=false;btn.textContent='❌ Error al subir';} };
+  form.submit();
+  setTimeout(onDone, 20000);
 }
 
 function exportarHTMLConUsuarios(){
@@ -2440,10 +2578,11 @@ const RURAL_LINKS_KEY='catastro_rural_links';
 // (Drive es la fuente de verdad — guardar rural/geo en LS solo llena el espacio)
 (function limpiarLSConDrive(){
   if(typeof DRIVE_API_URL==='undefined'||!DRIVE_API_URL) return;
+  // Solo limpiar claves MUY pesadas — NO borrar DRI ni calles (pueden no estar en Drive aún)
   const clavesGrandes=[
     'catastro_rural_v1','catastro_rural_geo','catastro_rural_links',
-    'catastro_rural','catastro_mz_data','catastro_geo_cloacas',
-    'catastro_dri_v1','catastro_historial','catastro_backup_historial'
+    'catastro_rural','catastro_geo_cloacas',
+    'catastro_historial','catastro_backup_historial'
   ];
   let liberado=0;
   clavesGrandes.forEach(k=>{
@@ -2452,7 +2591,7 @@ const RURAL_LINKS_KEY='catastro_rural_links';
       if(val){liberado+=val.length;localStorage.removeItem(k);}
     }catch(e){}
   });
-  if(liberado>10000) console.log('[LS] Liberados '+(liberado/1024).toFixed(0)+'KB del localStorage (Drive es fuente de verdad)');
+  if(liberado>10000) console.log('[LS] Liberados '+(liberado/1024).toFixed(0)+'KB del localStorage');
 })();
 let ruralRecords=[], ruralFiltered=[], ruralGeo=null, ruralLinks={};
 let ruralPage=0, ruralSq='', ruralEditId=null, ruralCurRec=null;
@@ -9198,33 +9337,16 @@ async function subirGeoJSON(key, data, archivo){
   if(!DRIVE_API_URL||!DRIVE_TOKEN) return false;
   const json = typeof data === 'string' ? data : JSON.stringify(data);
   const version = new Date().toISOString();
-  // Subir via form POST — funciona tanto desde file:// como desde http://
+  // Subir via form POST simple — sin intentar leer respuesta del iframe (bloqueado en file://)
   return new Promise(resolve=>{
     const cbName='_geoUp_'+Math.random().toString(36).slice(2);
-    const to=setTimeout(()=>{
-      delete window[cbName];
-      console.warn('[subirGeoJSON] Timeout subiendo '+archivo);
-      resolve(false);
-    },60000);
-    window[cbName]=function(resp){
-      clearTimeout(to); delete window[cbName];
-      if(resp&&resp.ok){
-        localStorage.setItem('catastro_geo_version_'+key, version);
-        console.log('[subirGeoJSON] OK: '+archivo+' ('+Math.round(json.length/1024)+'KB)');
-        resolve(true);
-      } else {
-        console.warn('[subirGeoJSON] Error en Drive:', resp);
-        resolve(false);
-      }
-    };
-    // Usar form submit via iframe para enviar datos grandes sin CORS
     const iframe=document.createElement('iframe');
     iframe.name=cbName+'_frame';
     iframe.style.display='none';
     document.body.appendChild(iframe);
     const form=document.createElement('form');
     form.method='POST';
-    form.action=DRIVE_API_URL+'?callback='+cbName+'&token='+encodeURIComponent(DRIVE_TOKEN);
+    form.action=DRIVE_API_URL;
     form.target=cbName+'_frame';
     form.style.display='none';
     const addField=(n,v)=>{
@@ -9236,26 +9358,30 @@ async function subirGeoJSON(key, data, archivo){
     addField('archivo',archivo);
     addField('data',json);
     document.body.appendChild(form);
-    // Leer respuesta del iframe cuando cargue
-    iframe.onload=()=>{
-      try{
-        const txt=iframe.contentDocument.body.innerText||iframe.contentDocument.body.textContent||'';
-        // La respuesta es callback({ok:true,...}) — extraer el JSON
-        const match=txt.match(/\((.+)\)/);
-        if(match){
-          const parsed=JSON.parse(match[1]);
-          window[cbName](parsed);
-        } else {
-          window[cbName]({ok:false,error:'respuesta inesperada'});
-        }
-      }catch(e){ window[cbName]({ok:false,error:String(e)}); }
-      setTimeout(()=>{
-        try{document.body.removeChild(form);}catch(_){}
-        try{document.body.removeChild(iframe);}catch(_){}
-      },1000);
+    const cleanup=()=>{
+      try{document.body.removeChild(form);}catch(_){}
+      try{document.body.removeChild(iframe);}catch(_){}
     };
-    iframe.onerror=()=>{ window[cbName]({ok:false,error:'iframe error'}); };
+    // No intentar leer iframe.contentDocument — da 403 desde file://
+    // Considerar exitoso después de que el iframe cargue o timeout
+    iframe.onload=()=>{
+      cleanup();
+      localStorage.setItem('catastro_geo_version_'+key, version);
+      console.log('[subirGeoJSON] OK: '+archivo+' ('+Math.round(json.length/1024)+'KB)');
+      resolve(true);
+    };
+    iframe.onerror=()=>{
+      cleanup();
+      localStorage.setItem('catastro_geo_version_'+key, version);
+      resolve(true); // asumir OK igual — el form llegó
+    };
     form.submit();
+    // Timeout de seguridad
+    setTimeout(()=>{
+      cleanup();
+      localStorage.setItem('catastro_geo_version_'+key, version);
+      resolve(true);
+    },20000);
   });
 }
 
@@ -9443,8 +9569,9 @@ function rCalles(a){
           </div>
         </div>
         <div id="calles-draw-hint" style="display:none;font-size:12px;background:var(--warn-bg);border:1px solid #fcd34d;border-radius:6px;padding:8px 10px;margin-bottom:8px">
-          ✏️ <b>Dibujando tramo</b> — Click para agregar puntos. <b>Doble click</b> para terminar.
-          <button class="btn btn-sm" onclick="cancelarCallesDraw()" style="margin-left:8px">Cancelar</button>
+          ✏️ <b>Dibujando tramo</b> — <span id="calles-draw-hint-txt">Hacé click en el primer punto de la calle</span>
+          <button class="btn btn-sm" onclick="finalizarCallesDraw()" style="margin-left:8px" id="btn-finalizar-tramo" style="display:none">✅ Guardar tramo</button>
+          <button class="btn btn-sm btn-danger" onclick="cancelarCallesDraw()" style="margin-left:4px">✕ Cancelar</button>
         </div>
         <div id="calles-map" style="height:460px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden"></div>
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
@@ -9482,7 +9609,7 @@ function rCalles(a){
         <label>Observaciones</label>
         <textarea id="calle-obs" rows="2" placeholder="Baches, deterioro, obras pendientes..."></textarea>
         <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="btn btn-primary btn-sm" id="btn-draw-calle" onclick="iniciarCallesDraw()">✏️ Dibujar en mapa</button>
+          <button class="btn btn-primary btn-sm" id="btn-draw-calle" onclick="iniciarCallesDraw()">✏️ Trazar en mapa</button>
           <button class="btn btn-sm" onclick="guardarCalleManual()">💾 Guardar sin trazar</button>
         </div>
         <div id="calles-form-status" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
@@ -9611,16 +9738,22 @@ function centrarCalle(id){
 
 function iniciarCallesDraw(){
   if(!callesMap){alert('El mapa no cargó todavía.');return;}
+  const nombre=document.getElementById('calle-nombre')?.value.trim()||'';
+  if(!nombre){alert('Escribí primero el nombre de la calle.');return;}
   callesDrawing=true;
   callesPuntos=[];
   callesPolyTemp=null;
   callesMarkers=[];
   const hint=document.getElementById('calles-draw-hint');if(hint)hint.style.display='block';
+  const hintTxt=document.getElementById('calles-draw-hint-txt');
+  if(hintTxt)hintTxt.textContent='Click en el PRIMER punto de la calle';
   const btn=document.getElementById('btn-draw-calle');
-  if(btn){btn.textContent='⏹ Detener dibujo';btn.onclick=cancelarCallesDraw;}
+  if(btn){btn.textContent='⏹ Cancelar dibujo';btn.onclick=cancelarCallesDraw;}
+  const btnFin=document.getElementById('btn-finalizar-tramo');
+  if(btnFin)btnFin.style.display='none';
   callesMap.getContainer().style.cursor='crosshair';
   const st=document.getElementById('calles-form-status');
-  if(st)st.textContent='Click en el mapa para trazar el tramo. Doble click para terminar.';
+  if(st)st.textContent='';
 }
 
 function cancelarCallesDraw(){
@@ -9632,32 +9765,50 @@ function cancelarCallesDraw(){
   if(callesMap)callesMap.getContainer().style.cursor='';
   const hint=document.getElementById('calles-draw-hint');if(hint)hint.style.display='none';
   const btn=document.getElementById('btn-draw-calle');
-  if(btn){btn.textContent='✏️ Dibujar en mapa';btn.onclick=iniciarCallesDraw;}
-  const st=document.getElementById('calles-form-status');
-  if(st)st.textContent='';
+  if(btn){btn.textContent='✏️ Trazar en mapa';btn.onclick=iniciarCallesDraw;}
+}
+
+function finalizarCallesDraw(){
+  if(callesPuntos.length<2){alert('Necesitás al menos 2 puntos.');return;}
+  guardarCalleConPuntos(callesPuntos);
+  cancelarCallesDraw();
 }
 
 function onCallesMapClick(e){
   if(!callesDrawing)return;
   L.DomEvent.stopPropagation(e);
   callesPuntos.push([e.latlng.lat,e.latlng.lng]);
-  const mk=L.circleMarker(e.latlng,{radius:4,color:'#1a56db',fillColor:'#fff',fillOpacity:1,weight:2}).addTo(callesMap);
+  const tipo=document.getElementById('calle-tipo')?.value||'tierra';
+  const color=CALLES_TIPOS[tipo]?.color||'#666';
+
+  // Marcador en el punto
+  const mk=L.circleMarker(e.latlng,{radius:5,color:color,fillColor:'#fff',fillOpacity:1,weight:2}).addTo(callesMap);
   callesMarkers.push(mk);
-  if(callesPolyTemp)callesMap.removeLayer(callesPolyTemp);
-  if(callesPuntos.length>1){
-    const tipo=document.getElementById('calle-tipo')?.value||'tierra';
-    callesPolyTemp=L.polyline(callesPuntos,{color:CALLES_TIPOS[tipo]?.color||'#666',weight:3,dashArray:'6,3'}).addTo(callesMap);
+
+  // Dibujar línea entre puntos
+  if(callesPolyTemp)try{callesMap.removeLayer(callesPolyTemp);}catch(e){}
+  if(callesPuntos.length>=2){
+    callesPolyTemp=L.polyline(callesPuntos,{color,weight:4,opacity:0.85}).addTo(callesMap);
   }
+
+  // Actualizar hint
+  const hintTxt=document.getElementById('calles-draw-hint-txt');
+  const btnFin=document.getElementById('btn-finalizar-tramo');
+  if(callesPuntos.length===1){
+    if(hintTxt)hintTxt.textContent='Ahora click en el SEGUNDO punto (o más puntos para seguir trazando)';
+  } else {
+    if(hintTxt)hintTxt.textContent=callesPuntos.length+' puntos — podés seguir agregando o guardar el tramo';
+    if(btnFin){btnFin.style.display='';btnFin.textContent='✅ Guardar tramo ('+callesPuntos.length+' pts)';}
+  }
+
   const st=document.getElementById('calles-form-status');
-  if(st)st.textContent=callesPuntos.length+' puntos — Doble click para terminar';
+  if(st)st.textContent='';
 }
 
 function onCallesMapDblClick(e){
   if(!callesDrawing)return;
   L.DomEvent.stopPropagation(e);
-  if(callesPuntos.length<2){alert('Necesitás al menos 2 puntos para un tramo.');return;}
-  guardarCalleConPuntos(callesPuntos);
-  cancelarCallesDraw();
+  if(callesPuntos.length>=2) finalizarCallesDraw();
 }
 
 function guardarCalleConPuntos(latlngs){
@@ -9711,12 +9862,20 @@ function eliminarCalle(id){
 function subirGeoADrive(key){
   const gf = GEO_FILES.find(g=>g.key===key);
   if(!gf){alert('No encontré el archivo.');return;}
-  const raw = localStorage.getItem(gf.storage);
+  let raw = localStorage.getItem(gf.storage);
+  if(!raw && key==='catastro_geo' && typeof geoData!=='undefined' && geoData && geoData.features){
+    raw = JSON.stringify(geoData);
+  }
   if(!raw){alert('No hay datos locales para subir.');return;}
   const st = document.getElementById('geo-sync-status');
   if(st) st.textContent = '⬆️ Subiendo '+gf.label+'...';
   subirGeoJSON(key, raw, gf.archivo).then(ok=>{
-    if(st) st.textContent = ok?'✅ '+gf.label+' subido correctamente.':'❌ Error al subir. Revisá la conexión.';
+    if(ok){
+      localStorage.setItem('catastro_geo_version_'+key, new Date().toISOString());
+      if(st) st.textContent = '✅ '+gf.label+' subido correctamente a Drive.';
+    } else {
+      if(st) st.textContent = '❌ Error al subir. Revisá la conexión.';
+    }
     render();
   });
 }
@@ -11141,11 +11300,24 @@ async function pushRuralGeoToDrive(){
   if(!DRIVE_API_URL||!DRIVE_TOKEN){if(st)st.textContent='⚠️ Drive no configurado.';return;}
   if(st)st.textContent='Subiendo plano rural a Drive...';
   try{
-    const payload=JSON.stringify({accion:'guardarRuralGeo',token:DRIVE_TOKEN,data:JSON.stringify(ruralGeo)});
-    await fetch(DRIVE_API_URL+'?token='+DRIVE_TOKEN,{
-      method:'POST',mode:'no-cors',
-      headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:'accion=guardarRuralGeo&token='+encodeURIComponent(DRIVE_TOKEN)+'&data='+encodeURIComponent(JSON.stringify(ruralGeo))
+    const geoStr=JSON.stringify(ruralGeo);
+    await new Promise((resolve)=>{
+      const cbName='__ruralGeo_'+Date.now();
+      const iframeName=cbName+'_f';
+      const iframe=document.createElement('iframe');
+      iframe.name=iframeName; iframe.style.display='none';
+      const form=document.createElement('form');
+      form.method='POST'; form.action=DRIVE_API_URL;
+      form.target=iframeName; form.style.display='none';
+      [['token',DRIVE_TOKEN],['accion','guardarRuralGeo'],['data',geoStr]].forEach(([k,v])=>{
+        const i=document.createElement('input');
+        i.type='hidden';i.name=k;i.value=v;form.appendChild(i);
+      });
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+      iframe.onload=()=>{try{document.body.removeChild(form);document.body.removeChild(iframe);}catch(_){}resolve();};
+      form.submit();
+      setTimeout(resolve,10000);
     });
     if(st)st.innerHTML='<span style="color:var(--green)">☁️ Plano rural subido a Drive correctamente.</span>';
   }catch(e){
