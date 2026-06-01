@@ -1097,17 +1097,110 @@ function exportarTodoJunto(){
 const BACKUP_HIST_KEY = 'catastro_backup_historial';
 const MAX_BACKUPS = 10;
 
+// Snapshots LIVIANOS: solo guardan los vínculos (geoLinks + mzLinks), no los 4260
+// registros. Ocupan pocos KB, así que no llenan el localStorage. Sirven de red de
+// seguridad para no volver a perder vinculaciones.
+const SNAP_KEY = 'catastro_vinc_snapshots';
+
+function obtenerSnapshots(){
+  try{ const s=localStorage.getItem(SNAP_KEY); return s?JSON.parse(s):[]; }catch(e){ return []; }
+}
+
 function guardarSnapshotLocal(motivo){
-  // localStorage lleno — ignorar silenciosamente
+  try{
+    const nLinks=Object.keys(geoLinks||{}).length;
+    if(nLinks===0) return true; // no guardar estados vacíos
+    const snaps=obtenerSnapshots();
+    const last=snaps.length?snaps[snaps.length-1]:null;
+    // Evitar duplicados consecutivos idénticos
+    if(last && last.n===nLinks && JSON.stringify(last.geoLinks)===JSON.stringify(geoLinks)){
+      guardarSnapshotLocal._last=String(nLinks);
+      return true;
+    }
+    snaps.push({
+      fecha:new Date().toISOString(),
+      motivo:motivo||'',
+      n:nLinks,
+      nmz:Object.keys(mzLinks||{}).length,
+      geoLinks:geoLinks,
+      mzLinks:mzLinks||{}
+    });
+    while(snaps.length>MAX_BACKUPS) snaps.shift();
+    localStorage.setItem(SNAP_KEY, JSON.stringify(snaps));
+    guardarSnapshotLocal._last=String(nLinks);
+  }catch(e){ /* si el almacenamiento está lleno, ignorar en silencio */ }
   return true;
 }
 
-function obtenerSnapshots(){ return []; }
-function restaurarSnapshot(idx){}
-function descargarSnapshot(idx){}
+function restaurarSnapshot(idx){
+  const snaps=obtenerSnapshots();
+  const s=snaps[idx];
+  if(!s){ alert('Snapshot no encontrado.'); return; }
+  if(!confirm('¿Restaurar '+s.n+' vínculos del '+new Date(s.fecha).toLocaleString('es-AR')+'?\n\nReemplaza los vínculos actuales y los sube a Drive.')) return;
+  guardarSnapshotLocal('antes de restaurar snapshot');
+  geoLinks=s.geoLinks||{};
+  try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
+  if(s.mzLinks&&Object.keys(s.mzLinks).length>0){
+    mzLinks=s.mzLinks;
+    try{localStorage.setItem(MZ_LINKS_KEY,JSON.stringify(mzLinks));}catch(e){}
+  }
+  if(typeof pushToDrive==='function') pushToDrive(true);
+  alert('✅ Restaurados '+s.n+' vínculos. Se están subiendo a Drive.');
+  try{ filter(); render(); }catch(e){}
+}
+
+function descargarSnapshot(idx){
+  const snaps=obtenerSnapshots();
+  const s=snaps[idx];
+  if(!s) return;
+  const blob=new Blob([JSON.stringify(s.geoLinks,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='vinculos_snapshot_'+s.fecha.slice(0,10)+'_'+s.n+'.json';
+  a.click();
+}
 
 function rBackupHistorial(){
-  return '<p style="font-size:12px;color:var(--text3)">El localStorage está al límite de espacio. Los backups se descargan directamente como archivo JSON — usá el botón <b>💾 Backup</b> del menú superior para guardar una copia en tu PC o Drive.</p>';
+  const snaps=obtenerSnapshots();
+  if(!snaps.length){
+    return '<p style="font-size:12px;color:var(--text3)">Todavía no hay snapshots guardados. Se irán generando automáticamente a medida que trabajes con los vínculos.</p>';
+  }
+  let html='<div style="display:flex;flex-direction:column;gap:6px">';
+  for(let i=snaps.length-1;i>=0;i--){
+    const s=snaps[i];
+    const fecha=new Date(s.fecha).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 10px;background:var(--surface2);border-radius:6px">'
+        + '<div style="font-size:12px"><b>'+s.n+' vínculos</b> · '+fecha+'<div style="font-size:11px;color:var(--text3)">'+(s.motivo||'')+'</div></div>'
+        + '<div style="display:flex;gap:6px">'
+        + '<button class="btn btn-sm" style="background:#16a34a;color:#fff;border-color:#16a34a" onclick="restaurarSnapshot('+i+')">Restaurar</button>'
+        + '<button class="btn btn-sm" onclick="descargarSnapshot('+i+')">Descargar</button>'
+        + '</div></div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+// Importar vínculos desde un archivo (formato {padron:handle} o {geoLinks:{...}}).
+// Combina con lo actual (gana lo que ya tenés cargado) y sube a Drive.
+async function importarVinculosArchivo(){
+  const f=document.getElementById('vinc-restore-file');
+  if(!f||!f.files.length){ alert('Elegí primero el archivo de vínculos (vinculos_mapa_*.json).'); return; }
+  let data;
+  try{ data=JSON.parse(await f.files[0].text()); }catch(e){ alert('El archivo no es un JSON válido.'); return; }
+  let links=(data && data.geoLinks && typeof data.geoLinks==='object') ? data.geoLinks : data;
+  if(!links || typeof links!=='object' || Array.isArray(links)){ alert('Formato no reconocido. Se esperaba un objeto padrón→handle.'); return; }
+  const nuevos=Object.keys(links).length;
+  if(nuevos===0){ alert('El archivo no contiene vínculos.'); return; }
+  const actuales=Object.keys(geoLinks||{}).length;
+  if(!confirm('El archivo tiene '+nuevos+' vínculos. Ahora tenés '+actuales+'.\n\nSe combinarán (conservando los que ya tenés) y se subirán a Drive. ¿Continuar?')) return;
+  guardarSnapshotLocal('antes de importar vínculos desde archivo');
+  geoLinks=Object.assign({}, links, geoLinks); // base: archivo; encima: lo local (conserva lo nuevo)
+  try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
+  const total=Object.keys(geoLinks).length;
+  guardarSnapshotLocal('importación desde archivo ('+total+' vínculos)');
+  if(typeof pushToDrive==='function') pushToDrive(true);
+  alert('✅ Listo: ahora hay '+total+' vínculos y se están subiendo a Drive.');
+  try{ filter(); render(); }catch(e){}
 }
 
 
@@ -1186,21 +1279,37 @@ function pullFromDrive(showAlert=false){
         }
       }
       if(data.historial) historial=data.historial;
-      // geoLinks: Drive es la fuente de verdad — reemplazar completamente
-      if(data.geoLinks&&Object.keys(data.geoLinks).length>0){
-        geoLinks=data.geoLinks;
-        try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
-        console.log('[Sync] geoLinks actualizados: '+Object.keys(geoLinks).length+' vínculos');
+      // geoLinks: Drive es fuente de verdad, PERO con candado anti-borrado (igual que el padrón).
+      if(data.geoLinks&&typeof data.geoLinks==='object'){
+        const driveLinks=Object.keys(data.geoLinks).length;
+        const localLinks=Object.keys(geoLinks).length;
+        if(driveLinks===0){
+          console.warn('[Sync] geoLinks: Drive tiene 0 vínculos — se conservan los '+localLinks+' locales');
+        } else if(localLinks>10 && driveLinks < localLinks*0.8){
+          // Drive trae MUCHOS menos que local → sospechoso. No pisar; subir lo local para corregir Drive.
+          console.warn('[Sync] geoLinks BLOQUEADO: Drive tiene '+driveLinks+' pero local tiene '+localLinks+'. No se aplica. Subiendo local a Drive.');
+          if(typeof pushToDrive==='function') pushToDrive(true);
+        } else {
+          geoLinks=data.geoLinks;
+          try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
+          console.log('[Sync] geoLinks actualizados: '+Object.keys(geoLinks).length+' vínculos');
+        }
       }
       // v36: los usuarios viven en usuarios.json (separado). Ya NO leemos data.usuarios
       // del catastro_backup.json — esa lista quedó obsoleta y sin contraseñas hasheadas.
       // La lista real se trae con refreshUsuariosFromDrive() después del login.
       if(data.calles&&Array.isArray(data.calles)) callesData=data.calles;
-      // mzLinks: Drive es la fuente de verdad — reemplazar completamente
-      if(data.mzLinks&&typeof data.mzLinks==='object'&&Object.keys(data.mzLinks).length>0){
-        mzLinks=data.mzLinks;
-        try{localStorage.setItem(MZ_LINKS_KEY,JSON.stringify(mzLinks));}catch(e){}
-        console.log('[Sync] mzLinks actualizados: '+Object.keys(mzLinks).length+' manzanas vinculadas');
+      // mzLinks: Drive es fuente de verdad, con el mismo candado anti-borrado.
+      if(data.mzLinks&&typeof data.mzLinks==='object'){
+        const driveMz=Object.keys(data.mzLinks).length;
+        const localMz=Object.keys(mzLinks).length;
+        if(driveMz>0 && (localMz<=10 || driveMz>=localMz*0.8)){
+          mzLinks=data.mzLinks;
+          try{localStorage.setItem(MZ_LINKS_KEY,JSON.stringify(mzLinks));}catch(e){}
+          console.log('[Sync] mzLinks actualizados: '+Object.keys(mzLinks).length+' manzanas vinculadas');
+        } else if(driveMz>0){
+          console.warn('[Sync] mzLinks BLOQUEADO: Drive tiene '+driveMz+' pero local tiene '+localMz+'. No se aplica.');
+        }
       }
       // mzData: Drive es la fuente de verdad
       if(data.mzData&&Array.isArray(data.mzData)&&data.mzData.length>0){
@@ -1789,6 +1898,14 @@ function rAjustes(a){if(!puedoVer('ajustes')){goList();return;}
         </div>
         <button class="btn btn-sm" onclick="doExportLinks()">Descargar</button>
       </div>`:''}
+      <div style="margin-top:8px;padding:10px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid #16a34a">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">♻️ Restaurar vínculos desde archivo</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Cargá un archivo <b>vinculos_mapa_*.json</b> (o un backup completo). Combina con lo actual sin borrar, y lo sube a Drive.</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="vinc-restore-file" accept=".json" style="width:auto;flex:1;min-width:200px;margin:0">
+          <button class="btn btn-primary" style="background:#16a34a;border-color:#16a34a" onclick="importarVinculosArchivo()">♻️ Restaurar vínculos</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="card" style="border-left:3px solid #16a34a">
