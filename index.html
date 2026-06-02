@@ -1299,17 +1299,17 @@ function pullFromDrive(showAlert=false){
       // del catastro_backup.json — esa lista quedó obsoleta y sin contraseñas hasheadas.
       // La lista real se trae con refreshUsuariosFromDrive() después del login.
       if(data.calles&&Array.isArray(data.calles)) callesData=data.calles;
-      // mzLinks: Drive es fuente de verdad, con el mismo candado anti-borrado.
+      // mzLinks: FUSIÓN (unión) para no perder vínculos de ninguna PC ni por sincronización
+      // a destiempo. Local gana en conflictos. Si local aporta vínculos que Drive no tenía,
+      // se sube la unión para que Drive quede completo.
       if(data.mzLinks&&typeof data.mzLinks==='object'){
         const driveMz=Object.keys(data.mzLinks).length;
-        const localMz=Object.keys(mzLinks).length;
-        if(driveMz>0 && (localMz<=10 || driveMz>=localMz*0.8)){
-          mzLinks=data.mzLinks;
-          try{localStorage.setItem(MZ_LINKS_KEY,JSON.stringify(mzLinks));}catch(e){}
-          console.log('[Sync] mzLinks actualizados: '+Object.keys(mzLinks).length+' manzanas vinculadas');
-        } else if(driveMz>0){
-          console.warn('[Sync] mzLinks BLOQUEADO: Drive tiene '+driveMz+' pero local tiene '+localMz+'. No se aplica.');
-        }
+        const antes=Object.keys(mzLinks).length;
+        mzLinks=Object.assign({}, data.mzLinks, mzLinks);
+        try{localStorage.setItem(MZ_LINKS_KEY,JSON.stringify(mzLinks));}catch(e){}
+        const despues=Object.keys(mzLinks).length;
+        console.log('[Sync] mzLinks combinados: '+despues+' (Drive '+driveMz+' + local '+antes+')');
+        if(despues>driveMz && typeof pushToDrive==='function') pushToDrive(true);
       }
       // mzData: Drive es la fuente de verdad
       if(data.mzData&&Array.isArray(data.mzData)&&data.mzData.length>0){
@@ -2734,6 +2734,10 @@ function doWipeManzanas(){
 }
 function saveMzLinks(){
   try{localStorage.setItem(MZ_LINKS_KEY,JSON.stringify(mzLinks));}catch(e){}
+  // ARREGLO: antes el vínculo de manzana solo se guardaba en localStorage y NO subía a
+  // Drive, así que en la siguiente sincronización Drive lo pisaba y "no se guardaba nada".
+  // Ahora sube a Drive igual que los vínculos de parcelas.
+  if(typeof DRIVE_API_URL!=='undefined'&&DRIVE_API_URL&&DRIVE_TOKEN&&typeof pushToDrive==='function') pushToDrive(true);
 }
 
 // ── VISOR DE MANZANAS ────────────────────────────────────────────────────────
