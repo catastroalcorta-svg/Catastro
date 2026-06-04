@@ -6570,38 +6570,36 @@ async function confirmarCambioClavePropia(){
   if(nueva.length<4){err.textContent='❌ La nueva contraseña debe tener al menos 4 caracteres.';return;}
   if(nueva!==confirm){err.textContent='❌ Las contraseñas no coinciden.';return;}
   err.style.color='var(--text3)';
-  err.textContent='⏳ Verificando...';
+  err.textContent='⏳ Guardando...';
   try{
-    // 1) Verificar que la actual sea correcta contra el backend
-    const verif = await _driveCall({
-      accion:'verificarLogin',
-      usuario: currentUser.usuario,
-      pass: actual
+    // Usar guardarUsuariosV2 con passPlano — igual que al crear un usuario nuevo.
+    // El backend preserva los hashes de los demás usuarios (sin passPlano).
+    // La verificación de la clave actual la hace el backend al comparar el hash.
+    const usuarios = getUsuarios();
+    const lista = usuarios.map(u=>({
+      usuario: u.usuario, nombre: u.nombre, rol: u.rol,
+      // Para el usuario actual: enviar passActual para que el backend verifique
+      // y passPlano para la nueva. Para los demás: sin passPlano (preserva hash).
+      ...(u.usuario === currentUser.usuario
+        ? { passActual: actual, passPlano: nueva }
+        : {})
+    }));
+    const resp = await _driveCall({
+      accion: 'guardarUsuariosV2',
+      usuarios: JSON.stringify(lista),
+      usuario: currentUser ? currentUser.nombre : '?'
     });
-    if(!verif || !verif.ok){
+    if(resp && resp.ok){
+      document.getElementById('modal-clave').remove();
+      const toast=document.createElement('div');
+      toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
+      toast.textContent='✅ Contraseña actualizada correctamente';
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(),3000);
+    } else {
       err.style.color='#f87171';
-      err.textContent='❌ La contraseña actual es incorrecta.';
-      return;
+      err.textContent='❌ Error: '+((resp&&resp.error)||'no se pudo actualizar. Verificá la contraseña actual.');
     }
-    // 2) Resetear con la nueva
-    const reset = await _driveCall({
-      accion:'resetPassword',
-      targetUsuario: currentUser.usuario,
-      nuevaPass: nueva,
-      usuario: currentUser.nombre
-    });
-    if(!reset || !reset.ok){
-      err.style.color='#f87171';
-      err.textContent='❌ Error: '+((reset&&reset.error)||'no se pudo actualizar');
-      return;
-    }
-    document.getElementById('modal-clave').remove();
-    // Toast de éxito
-    const toast=document.createElement('div');
-    toast.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.3)';
-    toast.textContent='✅ Contraseña actualizada correctamente';
-    document.body.appendChild(toast);
-    setTimeout(()=>toast.remove(),3000);
   }catch(e){
     err.style.color='#f87171';
     err.textContent='❌ Error de conexión: '+e;
@@ -6652,15 +6650,20 @@ async function confirmarCambioClaveAdmin(usuarioTarget){
   err.style.color='var(--text3)';
   err.textContent='⏳ Guardando...';
   try{
-    const reset = await _driveCall({
-      accion:'resetPassword',
-      targetUsuario: usuarioTarget,
-      nuevaPass: nueva,
-      usuario: currentUser.nombre
+    // Usar guardarUsuariosV2: el admin envía passPlano solo para el usuario target
+    const usuarios = getUsuarios();
+    const lista = usuarios.map(x=>({
+      usuario: x.usuario, nombre: x.nombre, rol: x.rol,
+      ...(x.usuario === usuarioTarget ? { passPlano: nueva } : {})
+    }));
+    const resp = await _driveCall({
+      accion: 'guardarUsuariosV2',
+      usuarios: JSON.stringify(lista),
+      usuario: currentUser ? currentUser.nombre : '?'
     });
-    if(!reset || !reset.ok){
+    if(!resp || !resp.ok){
       err.style.color='#f87171';
-      err.textContent='❌ Error: '+((reset&&reset.error)||'no se pudo actualizar');
+      err.textContent='❌ Error: '+((resp&&resp.error)||'no se pudo actualizar');
       return;
     }
     document.getElementById('modal-clave-admin').remove();
