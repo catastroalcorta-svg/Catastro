@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flota — Corralón Comunal de Alcorta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --concrete:#E9EAE5;
+  --concrete-2:#DFE0DA;
+  --surface:#FFFFFF;
+  --ink:#191B1D;
+  --steel:#5C636B;
+  --steel-2:#878E96;
+  --line:#D2D4CE;
+  --amber:#F5A800;
+  --amber-deep:#C98400;
+  --ok:#2F7D45;
+  --ok-bg:#E4F1E7;
+  --soon:#C77400;
+  --soon-bg:#FBEDD6;
+  --late:#C12B2B;
+  --late-bg:#FBE3E1;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(25,27,29,.06), 0 6px 18px rgba(25,27,29,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--concrete);
+  color:var(--ink);
+  font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-size:15px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+.tabnum{font-variant-numeric:tabular-nums}
+
+/* ---------- Header ---------- */
+header.top{
+  background:var(--ink);color:#F4F4F1;position:sticky;top:0;z-index:40;
+}
+.hazard{height:6px;background:repeating-linear-gradient(135deg,var(--amber) 0 18px,var(--ink) 18px 36px)}
+.top-inner{max-width:1180px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:13px;margin-right:auto}
+.brand .badge{
+  width:40px;height:40px;border-radius:8px;background:var(--amber);color:var(--ink);
+  display:grid;place-items:center;font-family:"Oswald";font-weight:700;font-size:13px;letter-spacing:.5px;line-height:1;text-align:center
+}
+.brand h1{font-family:"Oswald";font-weight:600;font-size:19px;letter-spacing:.3px;margin:0;text-transform:uppercase}
+.brand .sub{font-size:11.5px;color:#A9AEB3;letter-spacing:.4px;margin-top:1px}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{
+  border:1px solid transparent;border-radius:8px;padding:8px 13px;font-size:13.5px;font-weight:600;
+  display:inline-flex;align-items:center;gap:7px;transition:.12s;background:#2A2D30;color:#EDEEEC;
+}
+.btn:hover{background:#34383B}
+.btn.ghost{background:transparent;color:#CDD0CE;border-color:#3A3E41}
+.btn.ghost:hover{background:#2A2D30}
+.btn.amber{background:var(--amber);color:var(--ink)}
+.btn.amber:hover{background:#FFB81F}
+.btn.sm{padding:6px 10px;font-size:12.5px}
+.btn.danger{background:transparent;color:var(--late);border-color:#E7B7b4}
+.btn.danger:hover{background:var(--late-bg)}
+.btn svg{width:15px;height:15px}
+
+/* ---------- Nav ---------- */
+nav.tabs{max-width:1180px;margin:0 auto;padding:0 20px;display:flex;gap:2px}
+nav.tabs button{
+  background:none;border:none;padding:13px 16px 11px;font-size:14px;font-weight:600;color:var(--steel);
+  border-bottom:3px solid transparent;font-family:"Oswald";letter-spacing:.4px;text-transform:uppercase;
+}
+nav.tabs button .pill{margin-left:7px;background:var(--concrete-2);color:var(--steel);border-radius:20px;font-family:"Inter";font-size:11px;padding:1px 8px;font-weight:700}
+nav.tabs button.active{color:var(--ink);border-bottom-color:var(--amber)}
+nav.tabs button.active .pill{background:var(--ink);color:#fff}
+.tabsbar{background:var(--concrete);border-bottom:1px solid var(--line);position:sticky;top:67px;z-index:30}
+
+/* ---------- Layout ---------- */
+main{max-width:1180px;margin:0 auto;padding:24px 20px 64px}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:0 0 16px;flex-wrap:wrap}
+.eyebrow{font-family:"Oswald";text-transform:uppercase;letter-spacing:1.2px;font-size:12px;color:var(--steel);font-weight:600}
+.section-head h2{font-family:"Oswald";font-weight:600;font-size:25px;margin:2px 0 0;letter-spacing:.3px;text-transform:uppercase}
+
+/* ---------- Stat counters ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat .num{font-family:"Oswald";font-size:40px;font-weight:600;line-height:1}
+.stat .lbl{font-size:12.5px;color:var(--steel);font-weight:600;letter-spacing:.2px;margin-top:3px}
+.stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+.stat.s-late::before{background:var(--late)} .stat.s-late .num{color:var(--late)}
+.stat.s-soon::before{background:var(--soon)} .stat.s-soon .num{color:var(--soon)}
+.stat.s-ok::before{background:var(--ok)} .stat.s-ok .num{color:var(--ok)}
+.stat.s-fleet::before{background:var(--ink)}
+
+/* ---------- Alert rows ---------- */
+.alert-group{margin-bottom:26px}
+.alert-group h3{font-family:"Oswald";text-transform:uppercase;letter-spacing:.6px;font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.late{background:var(--late)} .dot.soon{background:var(--soon)} .dot.ok{background:var(--ok)}
+.alert{
+  background:var(--surface);border:1px solid var(--line);border-left-width:5px;border-radius:8px;
+  padding:12px 15px;margin-bottom:8px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);cursor:pointer;transition:.1s
+}
+.alert:hover{border-color:var(--steel-2)}
+.alert.late{border-left-color:var(--late)} .alert.soon{border-left-color:var(--soon)}
+.alert .a-veh{min-width:0;flex:1}
+.alert .a-dom{font-family:"Roboto Mono";font-weight:600;font-size:14px;letter-spacing:.5px}
+.alert .a-meta{font-size:12.5px;color:var(--steel);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alert .a-rubro{font-weight:600;font-size:13.5px}
+.alert .a-right{text-align:right;min-width:130px}
+.alert .a-status{font-weight:700;font-size:13px}
+.alert .a-detail{font-size:12px;color:var(--steel);margin-top:1px}
+.tag{display:inline-block;border-radius:20px;padding:2px 10px;font-size:11.5px;font-weight:700;letter-spacing:.2px}
+.tag.late{background:var(--late-bg);color:var(--late)} .tag.soon{background:var(--soon-bg);color:var(--soon)} .tag.ok{background:var(--ok-bg);color:var(--ok)}
+
+/* ---------- Unit cards ---------- */
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.toolbar input[type=search]{flex:1;min-width:180px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--surface)}
+.toolbar select{border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--surface)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.card-top{padding:14px 15px 12px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:10px}
+.card-top .dom{font-family:"Roboto Mono";font-weight:600;font-size:18px;letter-spacing:1px}
+.card-top .tipo{font-size:12px;color:var(--steel);margin-top:1px}
+.card-top .interno{margin-left:auto;background:var(--concrete-2);color:var(--steel);font-family:"Oswald";font-weight:600;font-size:12px;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.card .desc{padding:11px 15px;font-size:13px;color:var(--steel)}
+.card .reading{padding:0 15px 12px;display:flex;align-items:baseline;gap:8px}
+.card .reading .val{font-family:"Oswald";font-size:26px;font-weight:600;color:var(--ink)}
+.card .reading .unit{font-size:13px;color:var(--steel);font-weight:600}
+.card .reading .date{font-size:11.5px;color:var(--steel-2);margin-left:auto}
+.card .statusbar{padding:10px 15px;border-top:1px dashed var(--line);display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.card .cardbtns{display:flex;border-top:1px solid var(--line)}
+.card .cardbtns button{flex:1;border:none;background:none;padding:11px;font-size:13px;font-weight:600;color:var(--steel);transition:.1s}
+.card .cardbtns button:hover{background:var(--concrete);color:var(--ink)}
+.card .cardbtns button+button{border-left:1px solid var(--line)}
+.estado-chip{position:absolute;top:0;right:0}
+.empty{background:var(--surface);border:1px dashed var(--steel-2);border-radius:var(--radius);padding:40px 20px;text-align:center;color:var(--steel)}
+.empty strong{display:block;font-family:"Oswald";font-size:18px;color:var(--ink);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+
+/* badge estado */
+.badge-estado{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;letter-spacing:.2px}
+.be-Activo{background:var(--ok-bg);color:var(--ok)}
+.be-En\ reparación{background:var(--soon-bg);color:var(--soon)}
+.be-Baja{background:var(--concrete-2);color:var(--steel)}
+
+/* ---------- Modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(20,22,24,.55);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:100%;max-width:680px;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:pop .14s ease}
+.modal.wide{max-width:880px}
+@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.modal{animation:none}}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.modal-head .hz{width:6px;align-self:stretch;border-radius:4px;background:var(--amber)}
+.modal-head h3{font-family:"Oswald";font-weight:600;text-transform:uppercase;letter-spacing:.4px;font-size:20px;margin:0}
+.modal-head .x{margin-left:auto;background:none;border:none;font-size:24px;color:var(--steel);line-height:1;padding:0 4px}
+.modal-body{padding:20px 22px}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.frow.three{grid-template-columns:1fr 1fr 1fr}
+.field{display:flex;flex-direction:column;gap:5px}
+.field.full{grid-column:1/-1}
+.field label{font-size:12.5px;font-weight:600;color:var(--steel);letter-spacing:.2px}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--surface);width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--amber);outline-offset:0;border-color:var(--amber)}
+.field .hint{font-size:11px;color:var(--steel-2)}
+
+/* detail modal */
+.dt-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.dt-head .big-dom{font-family:"Roboto Mono";font-size:26px;font-weight:600;letter-spacing:1px}
+.dt-reading{background:var(--ink);color:#fff;border-radius:10px;padding:12px 16px;text-align:right;margin-left:auto}
+.dt-reading .v{font-family:"Oswald";font-size:30px;font-weight:600;line-height:1}
+.dt-reading .u{font-size:12px;color:#AAB0B5}
+.plan-table{width:100%;border-collapse:collapse;margin-top:4px}
+.plan-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--steel);font-weight:700;padding:7px 8px;border-bottom:2px solid var(--line)}
+.plan-table td{padding:9px 8px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+.plan-table tr:last-child td{border-bottom:none}
+.plan-table .rb{font-weight:600}
+.plan-table .small{font-size:11.5px;color:var(--steel)}
+.linkbtn{background:none;border:none;color:var(--amber-deep);font-weight:600;font-size:12.5px;padding:0;text-decoration:underline;text-underline-offset:2px}
+.section-sep{font-family:"Oswald";text-transform:uppercase;letter-spacing:.6px;font-size:13px;color:var(--ink);margin:22px 0 8px;display:flex;align-items:center;justify-content:space-between}
+.hist-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;align-items:center}
+.hist-row .hd{font-family:"Roboto Mono";font-size:12.5px;color:var(--steel);min-width:82px}
+.hist-row .hr{font-weight:600;flex:1}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-size:13.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:90;opacity:0;transition:.2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+
+@media(max-width:680px){
+  .stats{grid-template-columns:1fr 1fr}
+  .frow,.frow.three{grid-template-columns:1fr}
+  .tabsbar{top:0;position:static}
+  header.top{position:static}
+  nav.tabs{overflow-x:auto}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="badge">CC<br>AL</div>
+      <div>
+        <h1>Flota · Corralón Comunal</h1>
+        <div class="sub">Comuna de Alcorta — Registro de unidades y mantenimiento</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn ghost sm" onclick="openConfig()" title="Umbrales de aviso">⚙ Avisos</button>
+      <button class="btn ghost sm" onclick="backupJSON()">⭳ Respaldo</button>
+      <button class="btn ghost sm" onclick="document.getElementById('restoreFile').click()">⭱ Restaurar</button>
+      <input type="file" id="restoreFile" accept="application/json" style="display:none" onchange="restoreJSON(event)">
+      <button class="btn amber sm" onclick="exportExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l6 6M15 13l-6 6"/></svg>
+        Exportar a Excel
+      </button>
+    </div>
+  </div>
+  <div class="hazard"></div>
+</header>
+
+<div class="tabsbar">
+  <nav class="tabs">
+    <button id="tab-tablero" class="active" onclick="go('tablero')">Tablero <span class="pill" id="pillAlertas">0</span></button>
+    <button id="tab-unidades" onclick="go('unidades')">Unidades <span class="pill" id="pillUnidades">0</span></button>
+  </nav>
+</div>
+
+<main id="view"></main>
+
+<!-- Generic modal -->
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   ALMACENAMIENTO (localStorage con respaldo en memoria)
+   ========================================================= */
+const Store = (() => {
+  let mem = {};
+  let ok = false;
+  try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); ok = true; } catch(e){ ok = false; }
+  return {
+    get(k){ try { return ok ? localStorage.getItem(k) : (mem[k] ?? null); } catch(e){ return mem[k] ?? null; } },
+    set(k,v){ try { ok ? localStorage.setItem(k,v) : (mem[k]=v); } catch(e){ mem[k]=v; } }
+  };
+})();
+const KEY = 'flotaCorralonAlcorta_v1';
+
+let state = { unidades: [], config: { umbralDias:30, umbralKm:1000, umbralHs:30 } };
+
+function load(){
+  const raw = Store.get(KEY);
+  if(raw){ try{ const p = JSON.parse(raw); state = Object.assign({unidades:[],config:{umbralDias:30,umbralKm:1000,umbralHs:30}}, p); state.config = Object.assign({umbralDias:30,umbralKm:1000,umbralHs:30}, p.config||{}); }catch(e){} }
+}
+function save(){ Store.set(KEY, JSON.stringify(state)); refreshPills(); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* =========================================================
+   HELPERS DE FECHA / NÚMERO
+   ========================================================= */
+const TIPOS = ['Camión','Camioneta','Utilitario','Auto','Tractor','Retroexcavadora','Motoniveladora','Pala cargadora','Acoplado','Moto','Otro'];
+const ESTADOS = ['Activo','En reparación','Baja'];
+const MAQUINARIA = ['Tractor','Retroexcavadora','Motoniveladora','Pala cargadora'];
+
+function hoy(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+function parseDate(s){ if(!s) return null; const p=s.split('-'); if(p.length===3) return new Date(+p[0],+p[1]-1,+p[2]); return null; }
+function fmtDate(s){ const d=parseDate(s); if(!d) return '—'; return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+function todayISO(){ const d=hoy(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function addMonths(d,m){ const r=new Date(d.getTime()); const day=r.getDate(); r.setMonth(r.getMonth()+m); if(r.getDate()<day) r.setDate(0); return r; }
+function diffDays(a,b){ return Math.round((a-b)/86400000); }
+function nf(n){ if(n===null||n===undefined||n==='') return '—'; return Number(n).toLocaleString('es-AR'); }
+function esc(s){ return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* =========================================================
+   LÓGICA DE ESTADO DE MANTENIMIENTO (semáforo)
+   ========================================================= */
+function estadoPlan(unidad, plan){
+  const umbralMed = unidad.medidor==='hs' ? state.config.umbralHs : state.config.umbralKm;
+  const r = { estado:'sindatos', restanteDias:null, restanteMed:null, proxFecha:null, proxLectura:null, detalle:'Sin último service cargado', rank:5 };
+  let venc=false, prox=false, detalles=[];
+
+  // por medidor (km / hs)
+  if(plan.intervaloMed && (plan.ultimaLectura!==''&&plan.ultimaLectura!==null&&plan.ultimaLectura!==undefined)){
+    const proxL = Number(plan.ultimaLectura)+Number(plan.intervaloMed);
+    const rest = proxL - Number(unidad.lectura||0);
+    r.proxLectura = proxL; r.restanteMed = rest;
+    if(rest<=0){ venc=true; detalles.push('Vencido por '+Math.abs(rest).toLocaleString('es-AR')+' '+unidad.medidor); }
+    else if(rest<=umbralMed){ prox=true; detalles.push('Faltan '+rest.toLocaleString('es-AR')+' '+unidad.medidor); }
+    else detalles.push('En '+rest.toLocaleString('es-AR')+' '+unidad.medidor);
+  }
+  // por tiempo (meses)
+  if(plan.intervaloMeses && plan.ultimaFecha){
+    const base = parseDate(plan.ultimaFecha);
+    if(base){
+      const pf = addMonths(base, Number(plan.intervaloMeses));
+      const rest = diffDays(pf, hoy());
+      r.proxFecha = pf; r.restanteDias = rest;
+      const fechaTxt = String(pf.getDate()).padStart(2,'0')+'/'+String(pf.getMonth()+1).padStart(2,'0')+'/'+pf.getFullYear();
+      if(rest<=0){ venc=true; detalles.push('Vencido el '+fechaTxt); }
+      else if(rest<=state.config.umbralDias){ prox=true; detalles.push('Vence el '+fechaTxt+' ('+rest+' d)'); }
+      else detalles.push('Vence '+fechaTxt);
+    }
+  }
+
+  const tieneRegla = (plan.intervaloMed && plan.ultimaLectura!=='' && plan.ultimaLectura!==null && plan.ultimaLectura!==undefined) ||
+                     (plan.intervaloMeses && plan.ultimaFecha);
+  if(!tieneRegla){ return r; }
+  if(venc){ r.estado='vencido'; r.rank=0; }
+  else if(prox){ r.estado='proximo'; r.rank=1; }
+  else { r.estado='aldia'; r.rank=2; }
+  r.detalle = detalles.join(' · ');
+  return r;
+}
+
+/* score para ordenar urgencia: más chico = más urgente */
+function urgencia(unidad, plan){
+  const e = estadoPlan(unidad, plan);
+  if(e.estado==='vencido'){
+    const a = e.restanteDias!==null ? e.restanteDias : 9999;
+    const b = e.restanteMed!==null ? e.restanteMed : 9999;
+    return -100000 + Math.min(a,b); // los más vencidos primero
+  }
+  if(e.estado==='proximo'){
+    const a = e.restanteDias!==null ? e.restanteDias : 9999;
+    return Math.min(a, e.restanteMed!==null ? e.restanteMed/50 : 9999);
+  }
+  return 1e9;
+}
+
+/* =========================================================
+   PLANES SUGERIDOS
+   ========================================================= */
+function planesSugeridos(unidad){
+  if(unidad.medidor==='hs'){
+    return [
+      {rubro:'Aceite y filtro de motor', intervaloMed:250, intervaloMeses:6},
+      {rubro:'Filtro de aire', intervaloMed:500, intervaloMeses:12},
+      {rubro:'Sistema hidráulico', intervaloMed:1000, intervaloMeses:12},
+      {rubro:'Engrase general', intervaloMed:50, intervaloMeses:null},
+      {rubro:'Refrigerante', intervaloMed:2000, intervaloMeses:24},
+    ];
+  }
+  return [
+    {rubro:'Aceite y filtro', intervaloMed:10000, intervaloMeses:6},
+    {rubro:'Filtro de aire', intervaloMed:20000, intervaloMeses:12},
+    {rubro:'Cubiertas', intervaloMed:40000, intervaloMeses:null},
+    {rubro:'Correa de distribución', intervaloMed:60000, intervaloMeses:48},
+    {rubro:'Líquido de frenos', intervaloMed:null, intervaloMeses:24},
+    {rubro:'RTO (Rev. Técnica Obligatoria)', intervaloMed:null, intervaloMeses:12},
+    {rubro:'Seguro', intervaloMed:null, intervaloMeses:12},
+  ];
+}
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+let currentTab = 'tablero';
+function go(tab){
+  currentTab = tab;
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  render();
+}
+function refreshPills(){
+  let alertas=0;
+  state.unidades.forEach(u=>(u.planes||[]).forEach(p=>{ const e=estadoPlan(u,p); if(e.estado==='vencido'||e.estado==='proximo') alertas++; }));
+  document.getElementById('pillAlertas').textContent = alertas;
+  document.getElementById('pillUnidades').textContent = state.unidades.length;
+}
+function render(){ refreshPills(); currentTab==='tablero' ? renderTablero() : renderUnidades(); }
+
+/* =========================================================
+   TABLERO
+   ========================================================= */
+function renderTablero(){
+  const v = document.getElementById('view');
+  const items = [];
+  state.unidades.forEach(u=>(u.planes||[]).forEach(p=>{
+    const e = estadoPlan(u,p);
+    items.push({u,p,e,score:urgencia(u,p)});
+  }));
+  const vencidos = items.filter(i=>i.e.estado==='vencido').sort((a,b)=>a.score-b.score);
+  const proximos = items.filter(i=>i.e.estado==='proximo').sort((a,b)=>a.score-b.score);
+  const aldia = items.filter(i=>i.e.estado==='aldia').length;
+  const activas = state.unidades.filter(u=>u.estado==='Activo').length;
+
+  let html = `
+    <div class="section-head">
+      <div><div class="eyebrow">Estado de la flota</div><h2>Tablero de mantenimiento</h2></div>
+      <button class="btn amber sm" onclick="formUnidad()">+ Nueva unidad</button>
+    </div>
+    <div class="stats">
+      <div class="stat s-late"><div class="num tabnum">${vencidos.length}</div><div class="lbl">Mantenimientos vencidos</div></div>
+      <div class="stat s-soon"><div class="num tabnum">${proximos.length}</div><div class="lbl">Próximos a vencer</div></div>
+      <div class="stat s-ok"><div class="num tabnum">${aldia}</div><div class="lbl">Al día</div></div>
+      <div class="stat s-fleet"><div class="num tabnum">${activas}/${state.unidades.length}</div><div class="lbl">Unidades activas</div></div>
+    </div>`;
+
+  if(state.unidades.length===0){
+    html += `<div class="empty"><strong>Todavía no hay unidades</strong>Cargá los vehículos y máquinas del corralón para empezar a controlar los mantenimientos.<br><br><button class="btn amber" onclick="formUnidad()">+ Cargar primera unidad</button></div>`;
+    v.innerHTML = html; return;
+  }
+
+  if(vencidos.length===0 && proximos.length===0){
+    html += `<div class="empty" style="border-color:var(--ok);color:var(--ok)"><strong style="color:var(--ok)">Todo al día ✓</strong>No hay mantenimientos vencidos ni próximos a vencer. Acordate de actualizar el kilometraje/horas para que los avisos sigan siendo precisos.</div>`;
+  }
+  if(vencidos.length){
+    html += `<div class="alert-group"><h3><span class="dot late"></span>Vencidos · requieren atención</h3>${vencidos.map(alertRow).join('')}</div>`;
+  }
+  if(proximos.length){
+    html += `<div class="alert-group"><h3><span class="dot soon"></span>Próximos a vencer</h3>${proximos.map(alertRow).join('')}</div>`;
+  }
+  v.innerHTML = html;
+}
+function alertRow({u,p,e}){
+  const cls = e.estado==='vencido'?'late':'soon';
+  const tag = e.estado==='vencido'?'Vencido':'Próximo';
+  return `<div class="alert ${cls}" onclick="openDetalle('${u.id}')">
+    <div class="a-veh">
+      <span class="a-dom">${esc(u.dominio||'(sin dominio)')}</span>
+      <div class="a-meta">${esc(u.tipo)} · ${esc(u.marca||'')} ${esc(u.modelo||'')} ${u.interno?('· Int. '+esc(u.interno)):''}</div>
+    </div>
+    <div class="a-veh"><div class="a-rubro">${esc(p.rubro)}</div><div class="a-meta">Lectura actual: ${nf(u.lectura)} ${u.medidor}</div></div>
+    <div class="a-right"><span class="tag ${cls}">${tag}</span><div class="a-detail">${esc(e.detalle)}</div></div>
+  </div>`;
+}
+
+/* =========================================================
+   UNIDADES
+   ========================================================= */
+let filtroTexto='', filtroTipo='', filtroEstado='';
+function renderUnidades(){
+  const v = document.getElementById('view');
+  let html = `
+    <div class="section-head">
+      <div><div class="eyebrow">Parque automotor</div><h2>Unidades del corralón</h2></div>
+      <button class="btn amber sm" onclick="formUnidad()">+ Nueva unidad</button>
+    </div>
+    <div class="toolbar">
+      <input type="search" placeholder="Buscar por dominio, marca, modelo, interno…" value="${esc(filtroTexto)}" oninput="filtroTexto=this.value;renderUnidades()">
+      <select onchange="filtroTipo=this.value;renderUnidades()"><option value="">Todos los tipos</option>${TIPOS.map(t=>`<option ${filtroTipo===t?'selected':''}>${t}</option>`).join('')}</select>
+      <select onchange="filtroEstado=this.value;renderUnidades()"><option value="">Todos los estados</option>${ESTADOS.map(t=>`<option ${filtroEstado===t?'selected':''}>${t}</option>`).join('')}</select>
+    </div>`;
+
+  const ft = filtroTexto.toLowerCase().trim();
+  const list = state.unidades.filter(u=>{
+    if(filtroTipo && u.tipo!==filtroTipo) return false;
+    if(filtroEstado && u.estado!==filtroEstado) return false;
+    if(ft){ const blob=(u.dominio+' '+u.marca+' '+u.modelo+' '+u.interno+' '+u.tipo).toLowerCase(); if(!blob.includes(ft)) return false; }
+    return true;
+  });
+
+  if(list.length===0){
+    html += `<div class="empty"><strong>No hay unidades</strong>${state.unidades.length? 'Ninguna coincide con el filtro.' : 'Cargá la primera unidad para empezar.'}<br><br><button class="btn amber" onclick="formUnidad()">+ Nueva unidad</button></div>`;
+    v.innerHTML=html; return;
+  }
+
+  html += `<div class="grid">${list.map(cardUnidad).join('')}</div>`;
+  v.innerHTML = html;
+}
+function cardUnidad(u){
+  const planes = u.planes||[];
+  let nLate=0,nSoon=0;
+  planes.forEach(p=>{ const e=estadoPlan(u,p); if(e.estado==='vencido')nLate++; else if(e.estado==='proximo')nSoon++; });
+  let chips='';
+  if(nLate) chips+=`<span class="tag late">${nLate} vencido${nLate>1?'s':''}</span>`;
+  if(nSoon) chips+=`<span class="tag soon">${nSoon} próximo${nSoon>1?'s':''}</span>`;
+  if(!nLate&&!nSoon) chips = planes.length? `<span class="tag ok">Al día</span>` : `<span class="tag" style="background:var(--concrete-2);color:var(--steel)">Sin plan cargado</span>`;
+  return `<div class="card">
+    <div class="card-top">
+      <div>
+        <div class="dom">${esc(u.dominio||'—')}</div>
+        <div class="tipo">${esc(u.tipo)} · <span class="badge-estado be-${esc(u.estado)}">${esc(u.estado)}</span></div>
+      </div>
+      ${u.interno?`<div class="interno">Int. ${esc(u.interno)}</div>`:''}
+    </div>
+    <div class="desc">${esc([u.marca,u.modelo,u.anio].filter(Boolean).join(' '))||'<span style="color:var(--steel-2)">Sin datos de marca/modelo</span>'}</div>
+    <div class="reading">
+      <span class="val tabnum">${nf(u.lectura)}</span><span class="unit">${u.medidor}</span>
+      <span class="date">act. ${fmtDate(u.fechaLectura)}</span>
+    </div>
+    <div class="statusbar">${chips}</div>
+    <div class="cardbtns">
+      <button onclick="openDetalle('${u.id}')">Ver / Services</button>
+      <button onclick="quickLectura('${u.id}')">Actualizar km/hs</button>
+    </div>
+  </div>`;
+}
+
+/* =========================================================
+   MODAL GENÉRICO
+   ========================================================= */
+function openModal(html, wide){
+  const m = document.getElementById('modal');
+  m.className = 'modal'+(wide?' wide':'');
+  m.innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+document.getElementById('overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* =========================================================
+   FORM UNIDAD (alta / edición)
+   ========================================================= */
+function formUnidad(id){
+  const u = id ? state.unidades.find(x=>x.id===id) : {medidor:'km',estado:'Activo',fechaLectura:todayISO(),planes:[],historial:[]};
+  const isNew = !id;
+  openModal(`
+    <div class="modal-head"><div class="hz"></div><h3>${isNew?'Nueva unidad':'Editar unidad'}</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="frow">
+        <div class="field"><label>Dominio / Patente</label><input id="f_dom" class="mono" value="${esc(u.dominio||'')}" placeholder="AB123CD" style="text-transform:uppercase"></div>
+        <div class="field"><label>Nº interno (opcional)</label><input id="f_int" value="${esc(u.interno||'')}" placeholder="Ej. 07"></div>
+      </div>
+      <div class="frow three">
+        <div class="field"><label>Tipo</label><select id="f_tipo" onchange="onTipoChange()">${TIPOS.map(t=>`<option ${u.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Mide en</label><select id="f_med">${['km','hs'].map(m=>`<option value="${m}" ${u.medidor===m?'selected':''}>${m==='km'?'Kilómetros (km)':'Horas (hs)'}</option>`).join('')}</select></div>
+        <div class="field"><label>Estado</label><select id="f_estado">${ESTADOS.map(s=>`<option ${u.estado===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      </div>
+      <div class="frow three">
+        <div class="field"><label>Marca</label><input id="f_marca" value="${esc(u.marca||'')}" placeholder="Ford"></div>
+        <div class="field"><label>Modelo</label><input id="f_modelo" value="${esc(u.modelo||'')}" placeholder="F-4000"></div>
+        <div class="field"><label>Año</label><input id="f_anio" type="number" value="${esc(u.anio||'')}" placeholder="2014"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Lectura actual (<span id="medLbl">${u.medidor||'km'}</span>)</label><input id="f_lect" type="number" value="${u.lectura??''}" placeholder="0"></div>
+        <div class="field"><label>Fecha de la lectura</label><input id="f_flect" type="date" value="${u.fechaLectura||todayISO()}"></div>
+      </div>
+      <div class="field full"><label>Observaciones</label><textarea id="f_notas" rows="2" placeholder="Detalles, ubicación, responsable…">${esc(u.notas||'')}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${isNew?'':`<button class="btn danger" onclick="borrarUnidad('${u.id}')" style="margin-right:auto">Eliminar unidad</button>`}
+      <button class="btn ghost" style="color:var(--steel);border-color:var(--line)" onclick="closeModal()">Cancelar</button>
+      <button class="btn amber" onclick="guardarUnidad('${id||''}')">${isNew?'Crear unidad':'Guardar cambios'}</button>
+    </div>`);
+  document.getElementById('f_med').addEventListener('change',e=>{ document.getElementById('medLbl').textContent=e.target.value; });
+}
+function onTipoChange(){
+  const t = document.getElementById('f_tipo').value;
+  const med = document.getElementById('f_med');
+  if(MAQUINARIA.includes(t)){ med.value='hs'; document.getElementById('medLbl').textContent='hs'; }
+}
+function guardarUnidad(id){
+  const dom = document.getElementById('f_dom').value.trim().toUpperCase();
+  const tipo = document.getElementById('f_tipo').value;
+  if(!dom && !document.getElementById('f_int').value.trim()){ toast('Cargá al menos el dominio o el Nº interno'); return; }
+  const data = {
+    dominio:dom, interno:document.getElementById('f_int').value.trim(), tipo,
+    medidor:document.getElementById('f_med').value, estado:document.getElementById('f_estado').value,
+    marca:document.getElementById('f_marca').value.trim(), modelo:document.getElementById('f_modelo').value.trim(),
+    anio:document.getElementById('f_anio').value.trim(),
+    lectura:document.getElementById('f_lect').value!==''?Number(document.getElementById('f_lect').value):0,
+    fechaLectura:document.getElementById('f_flect').value||todayISO(),
+    notas:document.getElementById('f_notas').value.trim()
+  };
+  if(id){ Object.assign(state.unidades.find(x=>x.id===id), data); }
+  else { state.unidades.push(Object.assign({id:uid(),planes:[],historial:[]}, data)); }
+  save(); closeModal(); render(); toast(id?'Unidad actualizada':'Unidad creada');
+}
+function borrarUnidad(id){
+  if(!confirm('¿Eliminar esta unidad y todo su historial? Esta acción no se puede deshacer.')) return;
+  state.unidades = state.unidades.filter(x=>x.id!==id);
+  save(); closeModal(); render(); toast('Unidad eliminada');
+}
+
+/* actualizar lectura rápido */
+function quickLectura(id){
+  const u = state.unidades.find(x=>x.id===id);
+  openModal(`
+    <div class="modal-head"><div class="hz"></div><h3>Actualizar ${u.medidor}</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <p style="margin-top:0;color:var(--steel);font-size:13.5px">${esc(u.dominio||u.interno)} — lectura actual registrada: <strong>${nf(u.lectura)} ${u.medidor}</strong></p>
+      <div class="frow">
+        <div class="field"><label>Nueva lectura (${u.medidor})</label><input id="q_lect" type="number" value="${u.lectura??''}" autofocus></div>
+        <div class="field"><label>Fecha</label><input id="q_fecha" type="date" value="${todayISO()}"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" style="color:var(--steel);border-color:var(--line)" onclick="closeModal()">Cancelar</button>
+      <button class="btn amber" onclick="guardarLectura('${id}')">Guardar lectura</button>
+    </div>`);
+}
+function guardarLectura(id){
+  const u = state.unidades.find(x=>x.id===id);
+  const val = document.getElementById('q_lect').value;
+  if(val==='') { toast('Ingresá la lectura'); return; }
+  u.lectura = Number(val); u.fechaLectura = document.getElementById('q_fecha').value||todayISO();
+  save(); closeModal(); render(); toast('Lectura actualizada');
+}
+
+/* =========================================================
+   DETALLE DE UNIDAD: plan + historial
+   ========================================================= */
+function openDetalle(id){
+  const u = state.unidades.find(x=>x.id===id);
+  const planes = u.planes||[];
+  const rows = planes.map(p=>{
+    const e = estadoPlan(u,p);
+    const tagcls = e.estado==='vencido'?'late':e.estado==='proximo'?'soon':e.estado==='aldia'?'ok':'';
+    const tagtxt = e.estado==='vencido'?'Vencido':e.estado==='proximo'?'Próximo':e.estado==='aldia'?'Al día':'Sin datos';
+    const interv = [p.intervaloMed?`${nf(p.intervaloMed)} ${u.medidor}`:'', p.intervaloMeses?`${p.intervaloMeses} m`:''].filter(Boolean).join(' / ')||'—';
+    const ult = [p.ultimaLectura!==''&&p.ultimaLectura!=null?`${nf(p.ultimaLectura)} ${u.medidor}`:'', p.ultimaFecha?fmtDate(p.ultimaFecha):''].filter(Boolean).join(' · ')||'—';
+    return `<tr>
+      <td class="rb">${esc(p.rubro)}<div class="small">cada ${interv}</div></td>
+      <td>${ult}</td>
+      <td>${tagcls?`<span class="tag ${tagcls}">${tagtxt}</span>`:`<span class="small">${tagtxt}</span>`}<div class="small">${esc(e.detalle)}</div></td>
+      <td style="white-space:nowrap;text-align:right">
+        <button class="linkbtn" onclick="registrarService('${u.id}','${p.id}')">Registrar</button> ·
+        <button class="linkbtn" onclick="formPlan('${u.id}','${p.id}')">Editar</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const hist = (u.historial||[]).slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const histHtml = hist.length ? hist.map(h=>`<div class="hist-row">
+      <span class="hd">${fmtDate(h.fecha)}</span>
+      <span class="hr">${esc(h.rubro)}${h.detalle?` — <span style="font-weight:400;color:var(--steel)">${esc(h.detalle)}</span>`:''}</span>
+      <span class="small mono">${h.lectura!=null&&h.lectura!==''?nf(h.lectura)+' '+u.medidor:''}</span>
+      <span class="small">${h.taller?esc(h.taller):''}${h.costo?` · $${nf(h.costo)}`:''}</span>
+      <button class="linkbtn" onclick="borrarService('${u.id}','${h.id}')" title="Eliminar">✕</button>
+    </div>`).join('') : '<p class="small" style="color:var(--steel-2)">Todavía no hay services registrados.</p>';
+
+  openModal(`
+    <div class="modal-head"><div class="hz"></div><h3>${esc(u.dominio||'Unidad')}</h3>
+      <button class="btn ghost sm" style="color:var(--steel);border-color:var(--line);margin-left:8px" onclick="formUnidad('${u.id}')">Editar datos</button>
+      <button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <div class="dt-head">
+        <div>
+          <div class="big-dom">${esc(u.dominio||'—')}</div>
+          <div style="color:var(--steel);font-size:13.5px;margin-top:2px">${esc([u.tipo,u.marca,u.modelo,u.anio].filter(Boolean).join(' · '))} ${u.interno?`· Interno ${esc(u.interno)}`:''}</div>
+          <div style="margin-top:6px"><span class="badge-estado be-${esc(u.estado)}">${esc(u.estado)}</span></div>
+        </div>
+        <div class="dt-reading"><div class="v tabnum">${nf(u.lectura)}</div><div class="u">${u.medidor} · act. ${fmtDate(u.fechaLectura)}</div></div>
+      </div>
+      ${u.notas?`<div style="background:var(--concrete);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--steel);margin-bottom:14px">${esc(u.notas)}</div>`:''}
+
+      <div class="section-sep"><span>Plan de mantenimiento</span>
+        <span>
+          ${planes.length===0?`<button class="linkbtn" onclick="cargarSugeridos('${u.id}')">+ Cargar plan sugerido</button> · `:''}
+          <button class="linkbtn" onclick="formPlan('${u.id}')">+ Agregar rubro</button>
+        </span>
+      </div>
+      ${planes.length? `<table class="plan-table">
+        <thead><tr><th>Rubro / intervalo</th><th>Último service</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table>`
+        : `<p class="small" style="color:var(--steel-2)">Sin rubros cargados. Podés cargar un plan sugerido según el tipo de unidad o agregar rubros a mano.</p>`}
+
+      <div class="section-sep"><span>Historial de services</span></div>
+      ${histHtml}
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" style="color:var(--steel);border-color:var(--line)" onclick="closeModal()">Cerrar</button>
+    </div>`, true);
+}
+function cargarSugeridos(uid_){
+  const u = state.unidades.find(x=>x.id===uid_);
+  planesSugeridos(u).forEach(s=>{ u.planes.push(Object.assign({id:uid(),ultimaLectura:'',ultimaFecha:'',notas:''}, s)); });
+  save(); openDetalle(uid_); toast('Plan sugerido cargado');
+}
+
+/* form de rubro (plan) */
+function formPlan(uId, pId){
+  const u = state.unidades.find(x=>x.id===uId);
+  const p = pId ? u.planes.find(x=>x.id===pId) : {rubro:'',intervaloMed:'',intervaloMeses:'',ultimaLectura:'',ultimaFecha:'',notas:''};
+  const isNew = !pId;
+  openModal(`
+    <div class="modal-head"><div class="hz"></div><h3>${isNew?'Agregar rubro':'Editar rubro'}</h3><button class="x" onclick="openDetalle('${uId}')">×</button></div>
+    <div class="modal-body">
+      <div class="field full" style="margin-bottom:14px"><label>Rubro de mantenimiento</label>
+        <input id="p_rubro" value="${esc(p.rubro)}" placeholder="Ej. Aceite y filtro, Cubiertas, RTO, Seguro…" list="rubrosList">
+        <datalist id="rubrosList">${['Aceite y filtro','Filtro de aire','Cubiertas','Correa de distribución','Líquido de frenos','RTO (Rev. Técnica Obligatoria)','Seguro','Patente / Impuesto','Sistema hidráulico','Engrase general','Batería','Frenos'].map(r=>`<option value="${r}">`).join('')}</datalist>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Intervalo por ${u.medidor} <span class="hint">(opcional)</span></label><input id="p_med" type="number" value="${p.intervaloMed??''}" placeholder="Ej. ${u.medidor==='hs'?'250':'10000'}"></div>
+        <div class="field"><label>Intervalo por tiempo (meses) <span class="hint">(opcional)</span></label><input id="p_meses" type="number" value="${p.intervaloMeses??''}" placeholder="Ej. 6"></div>
+      </div>
+      <p class="hint" style="margin:-4px 0 14px">El aviso se dispara con lo que ocurra primero: alcanzar el intervalo de ${u.medidor} o el de tiempo.</p>
+      <div class="frow">
+        <div class="field"><label>Lectura del último service (${u.medidor})</label><input id="p_ulect" type="number" value="${p.ultimaLectura??''}" placeholder="${nf(u.lectura)}"></div>
+        <div class="field"><label>Fecha del último service</label><input id="p_ufecha" type="date" value="${p.ultimaFecha||''}"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      ${isNew?'':`<button class="btn danger" onclick="borrarPlan('${uId}','${pId}')" style="margin-right:auto">Eliminar rubro</button>`}
+      <button class="btn ghost" style="color:var(--steel);border-color:var(--line)" onclick="openDetalle('${uId}')">Cancelar</button>
+      <button class="btn amber" onclick="guardarPlan('${uId}','${pId||''}')">Guardar</button>
+    </div>`);
+}
+function guardarPlan(uId, pId){
+  const u = state.unidades.find(x=>x.id===uId);
+  const rubro = document.getElementById('p_rubro').value.trim();
+  if(!rubro){ toast('Indicá el rubro'); return; }
+  const med = document.getElementById('p_med').value, meses = document.getElementById('p_meses').value;
+  const data = {
+    rubro,
+    intervaloMed: med!==''?Number(med):'', intervaloMeses: meses!==''?Number(meses):'',
+    ultimaLectura: document.getElementById('p_ulect').value!==''?Number(document.getElementById('p_ulect').value):'',
+    ultimaFecha: document.getElementById('p_ufecha').value||''
+  };
+  if(pId){ Object.assign(u.planes.find(x=>x.id===pId), data); }
+  else { u.planes.push(Object.assign({id:uid(),notas:''}, data)); }
+  save(); openDetalle(uId); toast('Rubro guardado');
+}
+function borrarPlan(uId,pId){
+  if(!confirm('¿Eliminar este rubro del plan?')) return;
+  const u = state.unidades.find(x=>x.id===uId);
+  u.planes = u.planes.filter(x=>x.id!==pId);
+  save(); openDetalle(uId);
+}
+
+/* registrar service realizado */
+function registrarService(uId, pId){
+  const u = state.unidades.find(x=>x.id===uId);
+  const p = u.planes.find(x=>x.id===pId);
+  openModal(`
+    <div class="modal-head"><div class="hz"></div><h3>Registrar service</h3><button class="x" onclick="openDetalle('${uId}')">×</button></div>
+    <div class="modal-body">
+      <p style="margin-top:0;color:var(--steel);font-size:13.5px">${esc(u.dominio||u.interno)} — <strong>${esc(p.rubro)}</strong></p>
+      <div class="frow">
+        <div class="field"><label>Fecha del service</label><input id="s_fecha" type="date" value="${todayISO()}"></div>
+        <div class="field"><label>Lectura (${u.medidor})</label><input id="s_lect" type="number" value="${u.lectura??''}"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Taller / responsable <span class="hint">(opcional)</span></label><input id="s_taller" placeholder="Taller municipal, Gomería…"></div>
+        <div class="field"><label>Costo $ <span class="hint">(opcional)</span></label><input id="s_costo" type="number" placeholder="0"></div>
+      </div>
+      <div class="field full"><label>Detalle <span class="hint">(opcional)</span></label><textarea id="s_det" rows="2" placeholder="Trabajos realizados, repuestos…"></textarea></div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13.5px;cursor:pointer"><input type="checkbox" id="s_updlect" checked> Actualizar también la lectura actual de la unidad</label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" style="color:var(--steel);border-color:var(--line)" onclick="openDetalle('${uId}')">Cancelar</button>
+      <button class="btn amber" onclick="guardarService('${uId}','${pId}')">Guardar service</button>
+    </div>`);
+}
+function guardarService(uId,pId){
+  const u = state.unidades.find(x=>x.id===uId);
+  const p = u.planes.find(x=>x.id===pId);
+  const fecha = document.getElementById('s_fecha').value||todayISO();
+  const lect = document.getElementById('s_lect').value;
+  const reg = {
+    id:uid(), rubro:p.rubro, fecha,
+    lectura: lect!==''?Number(lect):'', taller:document.getElementById('s_taller').value.trim(),
+    costo:document.getElementById('s_costo').value!==''?Number(document.getElementById('s_costo').value):'',
+    detalle:document.getElementById('s_det').value.trim()
+  };
+  u.historial = u.historial||[]; u.historial.push(reg);
+  // resetea el contador del plan
+  p.ultimaFecha = fecha;
+  if(lect!=='') p.ultimaLectura = Number(lect);
+  if(document.getElementById('s_updlect').checked && lect!==''){ u.lectura = Number(lect); u.fechaLectura = fecha; }
+  save(); openDetalle(uId); toast('Service registrado ✓');
+}
+function borrarService(uId,hId){
+  if(!confirm('¿Eliminar este registro del historial? (no modifica el contador del plan)')) return;
+  const u = state.unidades.find(x=>x.id===uId);
+  u.historial = (u.historial||[]).filter(x=>x.id!==hId);
+  save(); openDetalle(uId);
+}
+
+/* =========================================================
+   CONFIG DE AVISOS
+   ========================================================= */
+function openConfig(){
+  const c = state.config;
+  openModal(`
+    <div class="modal-head"><div class="hz"></div><h3>Umbrales de aviso</h3><button class="x" onclick="closeModal()">×</button></div>
+    <div class="modal-body">
+      <p style="margin-top:0;color:var(--steel);font-size:13.5px">Cuándo un mantenimiento empieza a mostrarse como <span class="tag soon">Próximo</span> antes de vencer.</p>
+      <div class="frow three">
+        <div class="field"><label>Anticipo por tiempo (días)</label><input id="c_dias" type="number" value="${c.umbralDias}"></div>
+        <div class="field"><label>Anticipo por km</label><input id="c_km" type="number" value="${c.umbralKm}"></div>
+        <div class="field"><label>Anticipo por horas</label><input id="c_hs" type="number" value="${c.umbralHs}"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" style="color:var(--steel);border-color:var(--line)" onclick="closeModal()">Cancelar</button>
+      <button class="btn amber" onclick="guardarConfig()">Guardar</button>
+    </div>`);
+}
+function guardarConfig(){
+  state.config.umbralDias = Number(document.getElementById('c_dias').value)||30;
+  state.config.umbralKm = Number(document.getElementById('c_km').value)||1000;
+  state.config.umbralHs = Number(document.getElementById('c_hs').value)||30;
+  save(); closeModal(); render(); toast('Umbrales actualizados');
+}
+
+/* =========================================================
+   EXPORT EXCEL / BACKUP / RESTORE
+   ========================================================= */
+function exportExcel(){
+  if(state.unidades.length===0){ toast('No hay datos para exportar'); return; }
+  const unidadesRows = state.unidades.map(u=>({
+    'Dominio':u.dominio, 'Nº Interno':u.interno, 'Tipo':u.tipo, 'Marca':u.marca, 'Modelo':u.modelo, 'Año':u.anio,
+    'Estado':u.estado, 'Mide en':u.medidor, 'Lectura actual':u.lectura, 'Fecha lectura':fmtDate(u.fechaLectura),
+    'Rubros en plan':(u.planes||[]).length, 'Observaciones':u.notas
+  }));
+  const planRows=[], vencRows=[], histRows=[];
+  state.unidades.forEach(u=>{
+    (u.planes||[]).forEach(p=>{
+      const e = estadoPlan(u,p);
+      const estadoTxt = {vencido:'VENCIDO',proximo:'PRÓXIMO',aldia:'Al día',sindatos:'Sin datos'}[e.estado];
+      planRows.push({
+        'Dominio':u.dominio,'Nº Interno':u.interno,'Rubro':p.rubro,
+        ['Intervalo ('+u.medidor+')']:p.intervaloMed||'', 'Intervalo (meses)':p.intervaloMeses||'',
+        'Últ. lectura':p.ultimaLectura, 'Últ. fecha':fmtDate(p.ultimaFecha),
+        'Próx. lectura':e.proxLectura||'', 'Próx. fecha':e.proxFecha?(String(e.proxFecha.getDate()).padStart(2,'0')+'/'+String(e.proxFecha.getMonth()+1).padStart(2,'0')+'/'+e.proxFecha.getFullYear()):'',
+        'Estado':estadoTxt, 'Detalle':e.detalle
+      });
+      if(e.estado==='vencido'||e.estado==='proximo'){
+        vencRows.push({'Dominio':u.dominio,'Nº Interno':u.interno,'Tipo':u.tipo,'Rubro':p.rubro,'Estado':estadoTxt,'Detalle':e.detalle,'Lectura actual':u.lectura+' '+u.medidor});
+      }
+    });
+    (u.historial||[]).forEach(h=>{
+      histRows.push({'Dominio':u.dominio,'Nº Interno':u.interno,'Fecha':fmtDate(h.fecha),'Rubro':h.rubro,'Lectura':h.lectura,'Taller/Resp.':h.taller,'Costo $':h.costo,'Detalle':h.detalle});
+    });
+  });
+
+  try{
+    const wb = XLSX.utils.book_new();
+    const add=(rows,name)=>{ const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'':''}]); XLSX.utils.book_append_sheet(wb,ws,name); };
+    add(vencRows,'Avisos'); add(unidadesRows,'Unidades'); add(planRows,'Plan mantenimiento'); add(histRows,'Historial services');
+    const fecha = todayISO();
+    XLSX.writeFile(wb, `Flota_Corralon_Alcorta_${fecha}.xlsx`);
+    toast('Excel generado ✓');
+  }catch(err){
+    // Fallback CSV si SheetJS no cargó
+    const rows = planRows; const heads = Object.keys(rows[0]||{'':''});
+    const csv = [heads.join(';')].concat(rows.map(r=>heads.map(h=>`"${(r[h]??'').toString().replace(/"/g,'""')}"`).join(';'))).join('\n');
+    downloadBlob('\ufeff'+csv, `Flota_Corralon_${todayISO()}.csv`, 'text/csv');
+    toast('Exportado como CSV (Excel no disponible)');
+  }
+}
+
+function downloadBlob(content, filename, type){
+  const blob = new Blob([content], {type});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+}
+function backupJSON(){
+  downloadBlob(JSON.stringify(state,null,2), `flota_respaldo_${todayISO()}.json`, 'application/json');
+  toast('Respaldo descargado');
+}
+function restoreJSON(ev){
+  const file = ev.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = e=>{
+    try{
+      const p = JSON.parse(e.target.result);
+      if(!p.unidades || !Array.isArray(p.unidades)) throw new Error('Formato inválido');
+      if(!confirm(`El respaldo tiene ${p.unidades.length} unidad(es). Esto reemplaza los datos actuales. ¿Continuar?`)) { ev.target.value=''; return; }
+      state = Object.assign({unidades:[],config:{umbralDias:30,umbralKm:1000,umbralHs:30}}, p);
+      state.config = Object.assign({umbralDias:30,umbralKm:1000,umbralHs:30}, p.config||{});
+      save(); render(); toast('Datos restaurados');
+    }catch(err){ alert('No se pudo leer el archivo: '+err.message); }
+    ev.target.value='';
+  };
+  r.readAsText(file);
+}
+
+/* =========================================================
+   INICIO
+   ========================================================= */
+load(); render();
+</script>
+</body>
+</html>
