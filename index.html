@@ -6569,25 +6569,17 @@ async function confirmarCambioClavePropia(){
   if(!actual){err.textContent='❌ Ingresá tu contraseña actual.';return;}
   if(nueva.length<4){err.textContent='❌ La nueva contraseña debe tener al menos 4 caracteres.';return;}
   if(nueva!==confirm){err.textContent='❌ Las contraseñas no coinciden.';return;}
+  if(!currentUser||!currentUser.usuario){err.textContent='❌ No hay sesión activa.';return;}
   err.style.color='var(--text3)';
   err.textContent='⏳ Guardando...';
   try{
-    // Usar guardarUsuariosV2 con passPlano — igual que al crear un usuario nuevo.
-    // El backend preserva los hashes de los demás usuarios (sin passPlano).
-    // La verificación de la clave actual la hace el backend al comparar el hash.
-    const usuarios = getUsuarios();
-    const lista = usuarios.map(u=>({
-      usuario: u.usuario, nombre: u.nombre, rol: u.rol,
-      // Para el usuario actual: enviar passActual para que el backend verifique
-      // y passPlano para la nueva. Para los demás: sin passPlano (preserva hash).
-      ...(u.usuario === currentUser.usuario
-        ? { passActual: actual, passPlano: nueva }
-        : {})
-    }));
+    // Cambia SOLO tu propio usuario, del lado del servidor, verificando la clave actual.
+    // No reconstruye ni pisa la lista completa de usuarios.
     const resp = await _driveCall({
-      accion: 'guardarUsuariosV2',
-      usuarios: JSON.stringify(lista),
-      usuario: currentUser ? currentUser.nombre : '?'
+      accion: 'cambiarClavePropia',
+      usuario: currentUser.usuario,
+      passActual: actual,
+      nuevaPass: nueva
     });
     if(resp && resp.ok){
       document.getElementById('modal-clave').remove();
@@ -6598,7 +6590,7 @@ async function confirmarCambioClavePropia(){
       setTimeout(()=>toast.remove(),3000);
     } else {
       err.style.color='#f87171';
-      err.textContent='❌ Error: '+((resp&&resp.error)||'no se pudo actualizar. Verificá la contraseña actual.');
+      err.textContent='❌ '+((resp&&resp.error)||'No se pudo actualizar.');
     }
   }catch(e){
     err.style.color='#f87171';
@@ -6650,16 +6642,12 @@ async function confirmarCambioClaveAdmin(usuarioTarget){
   err.style.color='var(--text3)';
   err.textContent='⏳ Guardando...';
   try{
-    // Usar guardarUsuariosV2: el admin envía passPlano solo para el usuario target
-    const usuarios = getUsuarios();
-    const lista = usuarios.map(x=>({
-      usuario: x.usuario, nombre: x.nombre, rol: x.rol,
-      ...(x.usuario === usuarioTarget ? { passPlano: nueva } : {})
-    }));
+    // Cambia SOLO al usuario target, del lado del servidor.
+    // No reconstruye ni pisa la lista completa de usuarios.
     const resp = await _driveCall({
-      accion: 'guardarUsuariosV2',
-      usuarios: JSON.stringify(lista),
-      usuario: currentUser ? currentUser.nombre : '?'
+      accion: 'resetPassword',
+      targetUsuario: usuarioTarget,
+      nuevaPass: nueva
     });
     if(!resp || !resp.ok){
       err.style.color='#f87171';
