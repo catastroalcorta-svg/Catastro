@@ -910,104 +910,126 @@ async function pushToDrive(silent=false){
       cloacaLinks, cloacaGeoLinks,
       driRecords,
       parcelasNuevas,
-      // Metadatos de última importación de deudas (fecha, usuario, totales)
       deudaUpdTasa: _getUpdInfo('tasa'),
       deudaUpdCloaca: _getUpdInfo('cloaca'),
       deudaUpdRural: _getUpdInfo('rural'),
       deudaUpdDRI: _getUpdInfo('dri'),
-      // Compatibilidad con versiones anteriores
       deudaFechaTasa: localStorage.getItem('catastro_deuda_fecha_tasa')||null,
       deudaFechaCloaca: localStorage.getItem('catastro_deuda_fecha_cloaca')||null,
       deudaFechaRural: localStorage.getItem('catastro_deuda_fecha_rural')||null,
-      // Info completa de última actualización de deudas (fecha + usuario + conteos)
       deudaUpdTasa: (()=>{try{return JSON.parse(localStorage.getItem('catastro_deuda_upd_tasa')||'null');}catch(e){return null;}})(),
       deudaUpdCloaca: (()=>{try{return JSON.parse(localStorage.getItem('catastro_deuda_upd_cloaca')||'null');}catch(e){return null;}})(),
       deudaUpdRural: (()=>{try{return JSON.parse(localStorage.getItem('catastro_deuda_upd_rural')||'null');}catch(e){return null;}})(),
       lastSync:new Date().toISOString(),
       savedBy:currentUser?currentUser.nombre:'?'
     };
-    await new Promise((resolve)=>{
-      function _formPost(params, onDone){
-        const cbName='__push_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-        const iframeName=cbName+'_f';
-        const iframe=document.createElement('iframe');
-        iframe.name=iframeName; iframe.style.display='none';
-        const form=document.createElement('form');
-        form.method='POST'; form.action=DRIVE_API_URL;
-        form.target=iframeName; form.style.display='none';
-        Object.keys(params).forEach(k=>{
-          const inp=document.createElement('input');
-          inp.type='hidden'; inp.name=k; inp.value=params[k];
-          form.appendChild(inp);
-        });
-        document.body.appendChild(iframe);
-        document.body.appendChild(form);
-        const cleanup=()=>{try{document.body.removeChild(form);}catch(_){}try{document.body.removeChild(iframe);}catch(_){}};
-        iframe.onload=()=>{ cleanup(); setTimeout(onDone,300); };
-        iframe.onerror=()=>{ cleanup(); onDone(); };
-        form.submit();
-        setTimeout(()=>{ cleanup(); onDone(); },15000);
-      }
 
-      // Dividir records en chunks de 500 para no superar 2MB por POST
-      const CHUNK=500;
-      const chunks=[];
-      for(let i=0;i<backup.records.length;i+=CHUNK){
-        chunks.push(backup.records.slice(i,i+CHUNK));
-      }
+    // ── POST confiable: fetch no-cors + body text/plain (lo parsea doPost por e.postData) ──
+    // Evita el iframe/echo que devolvía 403 y evita el doble disparo del onDone.
+    async function _postDrive(obj){
+      const body=JSON.stringify({token:DRIVE_TOKEN, accion:'guardarTodo', data:JSON.stringify(obj)});
+      try{
+        await fetch(DRIVE_API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body});
+      }catch(e){ console.warn('[Push] fetch error (se reintenta en verificación):',e); }
+      // Respuesta opaca (no-cors): pausa para que el server termine de escribir y suelte el lock.
+      await new Promise(r=>setTimeout(r,700));
+    }
 
-      // Función para enviar chunks de records secuencialmente
-      function enviarChunks(idx, onFin){
-        if(idx>=chunks.length){ onFin(); return; }
-        const isFirst=(idx===0);
-        const chunkBackup=isFirst?{
-          // Primer chunk: incluye todos los metadatos
-          version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
-          records:chunks[idx],
-          historial:backup.historial, geoLinks:backup.geoLinks,
-          mzLinks:backup.mzLinks, mzData:backup.mzData,
-          calles:backup.calles, usuarios:backup.usuarios,
-          cloacaLinks:backup.cloacaLinks, cloacaGeoLinks:backup.cloacaGeoLinks,
-          driRecords:backup.driRecords, parcelasNuevas:backup.parcelasNuevas,
-          deudaUpdTasa:backup.deudaUpdTasa, deudaUpdCloaca:backup.deudaUpdCloaca,
-          deudaUpdRural:backup.deudaUpdRural,
-          _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'replace'
-        }:{
-          // Chunks siguientes: solo records para agregar
-          version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
-          records:chunks[idx],
-          _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'append'
+    // ── Lectura SOLO de conteo (JSONP), sin tocar los datos locales ──
+    function _contarEnDrive(){
+      return new Promise(resolve=>{
+        const cb='cnt_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+        const limpiar=()=>{try{delete window[cb];}catch(_){}try{const s=document.getElementById(cb);if(s)s.remove();}catch(_){}};
+        const to=setTimeout(()=>{limpiar();resolve(null);},15000);
+        window[cb]=function(data){
+          clearTimeout(to); limpiar();
+          if(data&&Array.isArray(data.records)) resolve(data.records.length);
+          else resolve(null);
         };
-        const str=JSON.stringify(chunkBackup);
-        console.log('[Push] Chunk '+(idx+1)+'/'+chunks.length+': '+Math.round(str.length/1024)+'KB');
-        _formPost({token:DRIVE_TOKEN, accion:'guardarTodo', data:str}, ()=>{
-          enviarChunks(idx+1, onFin);
-        });
-      }
-
-      enviarChunks(0, ()=>{
-        // Último: rural records + links
-        if(backup.ruralRecords&&backup.ruralRecords.length>0){
-          const ruralBackup={
-            version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
-            ruralRecords:backup.ruralRecords, ruralLinks:backup.ruralLinks,
-            _chunkMode:'rural'
-          };
-          const str=JSON.stringify(ruralBackup);
-          console.log('[Push] Rural: '+Math.round(str.length/1024)+'KB');
-          _formPost({token:DRIVE_TOKEN, accion:'guardarTodo', data:str}, ()=>{
-            resolve({ok:true});
-          });
-        } else {
-          resolve({ok:true});
-        }
+        const s=document.createElement('script');
+        s.id=cb;
+        s.onerror=()=>{clearTimeout(to);limpiar();resolve(null);};
+        s.src=DRIVE_API_URL+'?token='+encodeURIComponent(DRIVE_TOKEN)+'&callback='+cb+'&_t='+Date.now();
+        document.head.appendChild(s);
       });
-    });
-    syncStatus='ok'; lastSyncTime=backup.lastSync;
+    }
+
+    // Dividir records en chunks de 500 para no superar 2MB por POST
+    const CHUNK=500;
+    const chunks=[];
+    for(let i=0;i<backup.records.length;i+=CHUNK){
+      chunks.push(backup.records.slice(i,i+CHUNK));
+    }
+    if(chunks.length===0) chunks.push([]); // caso borde: 0 records → un replace vacío igual escribe metadatos
+
+    function _payload(idx){
+      return idx===0 ? {
+        version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+        records:chunks[idx],
+        historial:backup.historial, geoLinks:backup.geoLinks,
+        mzLinks:backup.mzLinks, mzData:backup.mzData,
+        calles:backup.calles, usuarios:backup.usuarios,
+        cloacaLinks:backup.cloacaLinks, cloacaGeoLinks:backup.cloacaGeoLinks,
+        driRecords:backup.driRecords, parcelasNuevas:backup.parcelasNuevas,
+        deudaUpdTasa:backup.deudaUpdTasa, deudaUpdCloaca:backup.deudaUpdCloaca, deudaUpdRural:backup.deudaUpdRural,
+        _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'replace'
+      } : {
+        version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+        records:chunks[idx],
+        _chunkIdx:idx, _chunkTotal:chunks.length, _chunkMode:'append'
+      };
+    }
+
+    const esperado=backup.records.length;
+
+    // 1) Enviar SECUENCIALMENTE (uno por vez, sin reentradas ni duplicados)
+    for(let i=0;i<chunks.length;i++){
+      console.log('[Push] Chunk '+(i+1)+'/'+chunks.length+' ('+chunks[i].length+' regs)');
+      await _postDrive(_payload(i));
+    }
+
+    // 2) VERIFICAR el total real en Drive; si falta, reenviar los append y reverificar (hasta 3 veces)
+    let enDrive=await _contarEnDrive();
+    console.log('[Push] Verificación: Drive='+enDrive+' / esperado='+esperado);
+    let intentos=0;
+    while(enDrive!==null && enDrive<esperado && intentos<3){
+      intentos++;
+      console.warn('[Push] Incompleto ('+enDrive+'/'+esperado+'). Reintento '+intentos+'…');
+      for(let i=1;i<chunks.length;i++){ await _postDrive(_payload(i)); }
+      enDrive=await _contarEnDrive();
+      console.log('[Push] Reverificación: Drive='+enDrive+' / esperado='+esperado);
+    }
+
+    // 3) Rural (después de tener los urbanos completos)
+    if(backup.ruralRecords&&backup.ruralRecords.length>0){
+      console.log('[Push] Rural: '+backup.ruralRecords.length+' regs');
+      await _postDrive({
+        version:backup.version, savedBy:backup.savedBy, lastSync:backup.lastSync,
+        ruralRecords:backup.ruralRecords, ruralLinks:backup.ruralLinks,
+        _chunkMode:'rural'
+      });
+    }
+
+    // 4) Resultado HONESTO — nunca decir "guardado" si quedó corto
+    if(enDrive!==null && enDrive<esperado){
+      syncStatus='error'; updateSyncBadge();
+      const msg='⚠️ La subida a Drive quedó INCOMPLETA: Drive tiene '+enDrive+' de '+esperado+' parcelas.\n\nTus datos locales están intactos. Probá subir de nuevo; si sigue fallando, avisá antes de trabajar en otra PC.';
+      console.error('[Push] '+msg);
+      if(!silent) alert(msg);
+      return;
+    }
+    lastSyncTime=backup.lastSync;
     localStorage.setItem('catastro_last_sync', lastSyncTime);
+    if(enDrive===null){
+      syncStatus='ok';
+      console.warn('[Push] Chunks enviados, pero no se pudo verificar el conteo (Drive no respondió). Revisá al reconectar.');
+    } else {
+      syncStatus='ok';
+      console.log('[Push] ✅ Completo y verificado: '+enDrive+' parcelas en Drive.');
+    }
     if(!silent){
       const b=document.getElementById('sync-badge');
-      if(b) b.title='✅ Guardado en Drive: '+new Date(lastSyncTime).toLocaleTimeString('es-AR');
+      if(b) b.title='✅ Guardado y verificado en Drive: '+new Date(lastSyncTime).toLocaleTimeString('es-AR');
     }
   }catch(e){
     syncStatus='error';
@@ -11862,7 +11884,7 @@ loadData();
 <script>
 // Pre-cargar datos de archivos separados (necesario porque el HTML ya no los tiene embebidos)
 (function(){
-  function fetchJSON(url, cb){ fetch(url).then(function(r){return r.json();}).then(cb).catch(function(e){console.warn('No se pudo cargar '+url,e);}); }
+  function fetchJSON(url, cb){ fetch(url).then(function(r){return r.ok ? r.json() : null;}).then(function(d){ if(d) cb(d); }).catch(function(){ /* silencioso: estos archivos no están en el repo, los datos vienen de Drive */ }); }
   fetchJSON('catastro_parcelas.geojson', function(d){ GEOJSON_EMBEBIDO = d; });
   fetchJSON('catastro_cloacas.geojson', function(d){ GEOJSON_CLOACAS_EMBEBIDO = d; });
   fetchJSON('catastro_manzanas.json', function(d){ MANZANAS_EMBEBIDO = d; });
