@@ -2715,6 +2715,14 @@ function ejecutarDivision(){
     }
   }
 
+  // Despintar la parcela original: liberar su geometría del mapa para poder reasignarla
+  // (mismo criterio que al desvincular un lote de la manzana). No borra el registro ni su historial.
+  if(geoLinks[String(original.padron)]){
+    delete geoLinks[String(original.padron)];
+    try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
+    if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(original.padron, '');
+  }
+
   saveData();
   if(!DRIVE_API_URL||!DRIVE_TOKEN){try{localStorage.setItem('catastro_historial',JSON.stringify(historial));}catch(e){}}
   // SINCRONIZACIÓN GRANULAR: subir cada subdivisión + el original modificado/borrado
