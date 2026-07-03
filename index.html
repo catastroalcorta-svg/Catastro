@@ -7953,8 +7953,11 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo</b> — Hacé click en el mapa para trazar los vértices de la nueva parcela. Doble click para cerrar el polígono.
-      <button class="btn btn-sm" onclick="cancelarDraw()" style="margin-left:8px">Cancelar</button>
+      ✏️ <b>Modo dibujo activo</b> — Hacé click en el mapa para marcar cada vértice. Cuando termines, tocá <b>Cerrar polígono</b> (o doble click).
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
+        <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
+      </div>
     </div>
     <div id="map-status" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
     <div id="map-debug" style="font-size:10px;color:#666;margin-top:4px;font-family:monospace;background:#f8f8f8;padding:4px 8px;border-radius:4px;display:none"></div>`;
@@ -9081,11 +9084,28 @@ function onDrawClick(e){
 function onDrawDblClick(e){
   if(!drawModo) return;
   L.DomEvent.stopPropagation(e);
+  try{L.DomEvent.preventDefault(e);}catch(_){}
+  // El doble-click dispara 2 clicks previos que agregan vértices repetidos: los quitamos.
+  _dedupeUltimosVertices();
+  finalizarDraw();
+}
+
+// Quita del final los vértices repetidos/casi idénticos (los que mete el doble-click)
+function _dedupeUltimosVertices(){
+  const cerca=(a,b)=>Math.abs(a[0]-b[0])<1e-6 && Math.abs(a[1]-b[1])<1e-6;
+  while(drawPuntos.length>=2 && cerca(drawPuntos[drawPuntos.length-1],drawPuntos[drawPuntos.length-2])){
+    drawPuntos.pop();
+    const mk=drawMarkers.pop(); if(mk){try{leafMap.removeLayer(mk);}catch(e){}}
+  }
+}
+
+// Cierra el polígono (lo usa el botón "Cerrar polígono" y el doble-click)
+function finalizarDraw(){
+  if(!drawModo) return;
   if(drawPuntos.length<3){
-    alert('Necesitás al menos 3 vértices para crear un polígono.');
+    alert('Necesitás al menos 3 vértices para cerrar el polígono. Marcá más puntos en el mapa.');
     return;
   }
-  // Cerrar polígono
   const latlngs=[...drawPuntos];
   const nota=prompt('Nota para esta nueva parcela (ej: División Mz 45, Lote 3A):','');
   if(nota===null){cancelarDraw();return;}
@@ -9113,6 +9133,7 @@ function toggleDraw(){
   if(btn){btn.textContent='✏️ Cancelar dibujo';btn.style.background='#c0392b';btn.style.borderColor='#c0392b';}
   const hint=document.getElementById('draw-hint');if(hint)hint.style.display='block';
   leafMap.getContainer().style.cursor='crosshair';
+  try{leafMap.doubleClickZoom.disable();}catch(e){} // el doble-click cierra el polígono, no hace zoom
   // Escuchar clicks en el mapa para agregar vértices
   leafMap.on('click', onDrawClick);
   leafMap.on('dblclick', onDrawDblClick);
@@ -9127,6 +9148,7 @@ function cancelarDraw(){
   drawMarkers=[];
   leafMap.off('click', onDrawClick);
   leafMap.off('dblclick', onDrawDblClick);
+  try{leafMap.doubleClickZoom.enable();}catch(e){}
   if(leafMap) leafMap.getContainer().style.cursor='';
   const btn=document.getElementById('btn-draw');
   if(btn){btn.textContent='✏️ Dibujar división';btn.style.background='#8e44ad';btn.style.borderColor='#8e44ad';}
