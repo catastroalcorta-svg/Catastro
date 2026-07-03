@@ -8948,6 +8948,7 @@ function initMap(rec, handleExplicito){
       style:()=>({color:'#1d4ed8',weight:1.5,fillColor:'#bfdbfe',fillOpacity:0.3,opacity:0.9}),
       onEachFeature:(feat,layer)=>{
         layer.on('click',e=>{
+          if(drawModo){ onDrawClick(e); return; } // en modo dibujo, click sobre la parcela = vértice
           if(polySearchActive){ return; } // dejar que el evento llegue al mapa para polySearch
           L.DomEvent.stopPropagation(e);
           if(vincModo)confirmarVinculacion(feat.properties.handle,layer);
@@ -8962,7 +8963,7 @@ function initMap(rec, handleExplicito){
   }
 
   if(featVinculada){
-    curParcelLayer=L.geoJSON(featVinculada,{style:{color:'#ea580c',weight:3,fillColor:'#fde047',fillOpacity:0.9}}).addTo(leafMap);
+    curParcelLayer=L.geoJSON(featVinculada,{style:{color:'#ea580c',weight:3,fillColor:'#fde047',fillOpacity:0.9},interactive:false}).addTo(leafMap);
     console.log('[initMap] parcela vinculada pintada en amarillo');
   }
 
@@ -8978,7 +8979,7 @@ function resaltarHandle(handle,doZoom){
   if(curParcelLayer){try{leafMap.removeLayer(curParcelLayer);}catch(e){}curParcelLayer=null;}
   const feat=geoData.features.find(f=>String(f.properties.handle)===String(handle));
   if(!feat)return;
-  curParcelLayer=L.geoJSON(feat,{style:{color:'#e05c00',weight:3,fillColor:'#ffd166',fillOpacity:0.9}}).addTo(leafMap);
+  curParcelLayer=L.geoJSON(feat,{style:{color:'#e05c00',weight:3,fillColor:'#ffd166',fillOpacity:0.9},interactive:false}).addTo(leafMap);
   if(doZoom){
     const coords=feat.geometry.coordinates[0];
     const lons=coords.map(c=>c[0]),lats=coords.map(c=>c[1]);
@@ -9072,12 +9073,12 @@ function onDrawClick(e){
   L.DomEvent.stopPropagation(e);
   drawPuntos.push([e.latlng.lat, e.latlng.lng]);
   // Marcador en el vértice
-  const mk=L.circleMarker(e.latlng,{radius:5,color:'#e05c00',fillColor:'#fff',fillOpacity:1,weight:2}).addTo(leafMap);
+  const mk=L.circleMarker(e.latlng,{radius:5,color:'#e05c00',fillColor:'#fff',fillOpacity:1,weight:2,interactive:false}).addTo(leafMap);
   drawMarkers.push(mk);
   // Actualizar línea
   if(drawPolyline) leafMap.removeLayer(drawPolyline);
   if(drawPuntos.length>1){
-    drawPolyline=L.polyline(drawPuntos,{color:'#e05c00',weight:2,dashArray:'6,4'}).addTo(leafMap);
+    drawPolyline=L.polyline(drawPuntos,{color:'#e05c00',weight:2,dashArray:'6,4',interactive:false}).addTo(leafMap);
   }
   const st=document.getElementById('map-status');
   if(st) st.textContent='✏️ '+drawPuntos.length+' vértice'+( drawPuntos.length===1?'':'s')+' — Doble click para cerrar el polígono';
