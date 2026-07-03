@@ -2642,33 +2642,40 @@ function ejecutarDivision(){
       calle:g(`div-calle-${i}`),
       numero:g(`div-numero-${i}`),
       entreCalles:g(`div-entre-${i}`),
-      medNorte:g(`div-norte-${i}`),
-      medSur:g(`div-sur-${i}`),
-      medEste:g(`div-este-${i}`),
-      medOeste:g(`div-oeste-${i}`),
-      calleN:g(`div-callN-${i}`),
-      calleS:g(`div-callS-${i}`),
-      calleE:g(`div-callE-${i}`),
-      calleO:g(`div-callO-${i}`),
+      medNorte:g(`div-norte-${i}`),medSur:g(`div-sur-${i}`),medEste:g(`div-este-${i}`),medOeste:g(`div-oeste-${i}`),
+      calleN:g(`div-callN-${i}`),calleS:g(`div-callS-${i}`),calleE:g(`div-callE-${i}`),calleO:g(`div-callO-${i}`),
       estadoTerreno:g(`div-estado-${i}`),
       tipoInmueble:g(`div-tipo-${i}`)||'Urbano',
     });
   });
 
-  if(subdivs.length<2){alert('Necesitás al menos 2 subdivisiones.');return;}
-  if(subdivs.some(s=>!s.padron)){alert('Completá todos los números de padrón.');return;}
+  // ── VALIDACIÓN ANTICIPADA — no crea NADA si algo está mal ──
+  if(subdivs.length<2){alert('Necesitás al menos 2 parcelas resultantes.');return;}
+  if(subdivs.some(s=>!s.padron)){alert('Completá el N° de padrón de cada parcela resultante.');return;}
+  // Padrones repetidos entre las subdivisiones
+  const vistos={};
+  for(const s of subdivs){
+    const k=String(s.padron);
+    if(vistos[k]){alert('Repetiste el padrón "'+k+'" en dos parcelas. Cada una necesita un número distinto.');return;}
+    vistos[k]=true;
+  }
+  // Choque con OTRA parcela existente (se PERMITE reutilizar el padrón de la parcela que estás dividiendo)
+  for(const s of subdivs){
+    const otra=records.find(r=>String(r.padron)===String(s.padron)&&r.id!==original.id);
+    if(otra){
+      alert('El padrón '+s.padron+' ya pertenece a otra parcela (titular: '+(otra.titular||'—')+').\n\nUsá un número libre, o el mismo padrón de la parcela que estás dividiendo ('+original.padron+').');
+      return;
+    }
+  }
+
+  const reutilizaOriginal=subdivs.some(s=>String(s.padron)===String(original.padron));
   if(!confirm('¿Dividir padrón '+original.padron+' en '+subdivs.length+' parcelas?\n\n'+subdivs.map((s,i)=>String.fromCharCode(65+i)+': Padrón '+s.padron+(s.titular?' — '+s.titular:'')).join('\n')))return;
 
   const fecha=new Date().toISOString();
   const nuevosPatrones=[];
 
   subdivs.forEach((s,idx)=>{
-    if(records.find(r=>String(r.padron)===s.padron)){
-      alert('El padrón '+s.padron+' ya existe. Cambialo antes de continuar.'); return;
-    }
-    const nuevo={
-      ...original,
-      id:'r'+Date.now()+idx,
+    const datos={
       padron:s.padron,
       titular:s.titular||original.titular,
       manzana:s.manzana||original.manzana,
@@ -2682,60 +2689,55 @@ function ejecutarDivision(){
       tipoInmueble:s.tipoInmueble,
       estadoParcela:'División de '+original.padron,
       padronOrigen:original.padron,
-      // Calles del croquis
-      croquis:{
-        points:[], calles:{N:s.calleN,S:s.calleS,E:s.calleE,O:s.calleO},
-        lados:[], area:s.superficie?parseFloat(s.superficie):null
-      },
+      croquis:{ points:[], calles:{N:s.calleN,S:s.calleS,E:s.calleE,O:s.calleO}, lados:[], area:s.superficie?parseFloat(s.superficie):null },
       fecha
     };
-    records.push(nuevo);
+    if(String(s.padron)===String(original.padron)){
+      // Reutiliza el padrón original → actualiza el registro original EN SU LUGAR (conserva id, historial y vínculo al mapa)
+      const io=records.findIndex(r=>r.id===original.id);
+      if(io>=0) records[io]={...records[io], ...datos};
+      if(!historial[original.id]) historial[original.id]=[];
+      historial[original.id].push({fecha, tipo:'edicion', resumen:'Dividida — conserva el padrón '+s.padron, usuario:currentUser?.nombre||'?'});
+    } else {
+      // Parcela nueva
+      const nuevo={...original, id:'r'+Date.now()+idx, ...datos};
+      records.push(nuevo);
+      if(!historial[nuevo.id]) historial[nuevo.id]=[];
+      historial[nuevo.id].push({fecha, tipo:'alta', resumen:'Creada por división del padrón '+original.padron, usuario:currentUser?.nombre||'?'});
+    }
     nuevosPatrones.push(s.padron);
-    if(!historial[nuevo.id]) historial[nuevo.id]=[];
-    historial[nuevo.id].push({
-      fecha, tipo:'alta',
-      resumen:'Creada por división del padrón '+original.padron,
-      usuario:currentUser?.nombre||'?'
-    });
   });
 
-  // Procesar original
-  if(accion==='eliminar'){
-    records=records.filter(r=>r.id!==original.id);
-  } else {
-    const idx=records.findIndex(r=>r.id===original.id);
-    if(idx>=0){
-      records[idx].estadoParcela='Dividida en '+nuevosPatrones.join(', ');
-      if(!historial[original.id]) historial[original.id]=[];
-      historial[original.id].push({
-        fecha, tipo:'edicion',
-        resumen:'Dividida en padrones: '+nuevosPatrones.join(', '),
-        usuario:currentUser?.nombre||'?'
-      });
+  // ── Qué hacer con la parcela original (solo si NO se reutilizó su padrón) ──
+  if(!reutilizaOriginal){
+    if(accion==='eliminar'){
+      records=records.filter(r=>r.id!==original.id);
+      deleteParcelaFromDrive(original.id);
+    } else {
+      const io=records.findIndex(r=>r.id===original.id);
+      if(io>=0){
+        records[io].estadoParcela='Dividida en '+nuevosPatrones.join(', ');
+        if(!historial[original.id]) historial[original.id]=[];
+        historial[original.id].push({fecha, tipo:'edicion', resumen:'Dividida en padrones: '+nuevosPatrones.join(', '), usuario:currentUser?.nombre||'?'});
+        const r2=records[io]; if(r2) pushParcelaToDrive(r2);
+      }
     }
-  }
-
-  // Despintar la parcela original: liberar su geometría del mapa para poder reasignarla
-  // (mismo criterio que al desvincular un lote de la manzana). No borra el registro ni su historial.
-  if(geoLinks[String(original.padron)]){
-    delete geoLinks[String(original.padron)];
-    try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
-    if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(original.padron, '');
+    // Despintar la geometría de la original para poder reasignarla (si se reutilizó el padrón, NO se toca)
+    if(geoLinks[String(original.padron)]){
+      delete geoLinks[String(original.padron)];
+      try{localStorage.setItem(GEO_LINKS_KEY,JSON.stringify(geoLinks));}catch(e){}
+      if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(original.padron, '');
+    }
   }
 
   saveData();
   if(!DRIVE_API_URL||!DRIVE_TOKEN){try{localStorage.setItem('catastro_historial',JSON.stringify(historial));}catch(e){}}
-  // SINCRONIZACIÓN GRANULAR: subir cada subdivisión + el original modificado/borrado
-  records.filter(r=>nuevosPatrones.includes(r.padron)).forEach(r=>pushParcelaToDrive(r));
-  if(accion==='eliminar'){
-    deleteParcelaFromDrive(original.id);
-  } else {
-    const r2=records.find(x=>x.id===original.id);
-    if(r2) pushParcelaToDrive(r2);
-  }
+  // Subir a Drive las parcelas nuevas/actualizadas
+  records.filter(r=>nuevosPatrones.includes(String(r.padron))).forEach(r=>pushParcelaToDrive(r));
+
   operSelParcelas=[];
   divCount=2;
-  alert('✅ División completada.\nNuevos padrones: '+nuevosPatrones.join(', ')+'\n\nPodés editar cada parcela para agregar el croquis en el mapa.');
+  alert('✅ División completada.\nPadrones resultantes: '+nuevosPatrones.join(', '));
   goOperaciones();
 }
 
