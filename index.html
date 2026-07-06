@@ -6801,6 +6801,8 @@ function rCloacaEditor(a){
       <div style="font-size:12px;color:var(--text2)">Dibujá tramos de cañería, cámaras y conexiones directamente sobre el mapa.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="file" id="cloaca-import-file" accept=".json" style="display:none" onchange="importarConexionesArchivo(this)">
+      <button class="btn btn-sm" onclick="document.getElementById('cloaca-import-file').click()" style="background:#0d9488;color:#fff;border-color:#0d9488" title="Importar el detalle de cloacas (archivo JSON) y colocar/vincular las conexiones automáticamente">📥 Importar detalle</button>
       <button class="btn btn-sm" onclick="exportarGeoCloacasEditor()" style="background:#0d6efd;color:#fff;border-color:#0d6efd">⬇ Exportar GeoJSON</button>
       <button class="btn btn-sm" onclick="goList()">← Volver</button>
     </div>
@@ -6825,6 +6827,7 @@ function rCloacaEditor(a){
         <button class="btn btn-sm" onclick="cloacaSetModo('tramo')" style="background:#1a7a4a;color:#fff;border-color:#1a7a4a">🟩 Tramo colector</button>
         <button class="btn btn-sm" onclick="cloacaSetModo('camara')" style="background:#2d5fa8;color:#fff;border-color:#2d5fa8">🔵 Cámara</button>
         <button class="btn btn-sm" onclick="cloacaSetModo('conexion')" style="background:#e05c00;color:#fff;border-color:#e05c00">🟠 Conexión dom.</button>
+        <button class="btn btn-sm" onclick="cloacaSetModo('conexion-rapida')" style="background:#c2410c;color:#fff;border-color:#c2410c" title="Clic tras clic para agregar muchas conexiones sin formulario">⚡ Conexión rápida</button>
         <div style="width:1px;background:var(--border);margin:0 2px"></div>
         <button class="btn btn-sm" onclick="cloacaUndo()" id="btn-undo-cloaca" disabled style="opacity:.5">↩ Deshacer</button>
         <button class="btn btn-sm btn-danger" onclick="cloacaSetModo(null)" id="btn-modo-ninguno" style="display:none">✖ Cancelar</button>
@@ -6866,8 +6869,10 @@ function rCloacaEditor(a){
       <div id="cloaca-editor-seleccionado" class="card" style="padding:14px;display:none">
         <div style="font-size:13px;font-weight:700;margin-bottom:8px" id="cloaca-sel-titulo"></div>
         <div id="cloaca-sel-props" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-sm btn-danger" onclick="cloacaEliminarSeleccionado()" style="flex:1">🗑 Eliminar</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="cloacaEditarSeleccionado()" style="background:#2d5fa8;color:#fff;border-color:#2d5fa8">✏️ Editar</button>
+          <button class="btn btn-sm" onclick="cloacaMoverSeleccionado()" style="background:#7c3aed;color:#fff;border-color:#7c3aed">✥ Mover</button>
+          <button class="btn btn-sm btn-danger" onclick="cloacaEliminarSeleccionado()">🗑 Eliminar</button>
           <button class="btn btn-sm" onclick="document.getElementById('cloaca-editor-seleccionado').style.display='none'">✕</button>
         </div>
       </div>
@@ -6891,19 +6896,22 @@ function rCloacaEditor(a){
   setTimeout(()=>initCloacaEditorMap(), 150);
 }
 
-let _cloacaEditorPendiente = null, _cloacaSelFeat = null;
+let _cloacaEditorPendiente = null, _cloacaSelFeat = null, _cloacaModoEdicion=false, _cloacaMoviendo=null, _cloacaSyncTO=null;
 
 function cloacaSetModo(modo){
   cloacaEditorMode=modo; cloacaEditorPuntos=[];  _cloacaEditorPendiente=null;
+  _cloacaModoEdicion=false; _cloacaMoviendo=null;
   if(cloacaEditorTempLine&&cloacaEditorMap){cloacaEditorMap.removeLayer(cloacaEditorTempLine);cloacaEditorTempLine=null;}
   const form=document.getElementById('cloaca-editor-form'); if(form)form.style.display='none';
   const sel=document.getElementById('cloaca-editor-seleccionado'); if(sel)sel.style.display='none';
   const hint=document.getElementById('cloaca-editor-hint');
   const btnN=document.getElementById('btn-modo-ninguno');
+  // El doble-click cierra el tramo (no hace zoom) y no molesta en modo rápido
+  if(cloacaEditorMap){ try{ modo?cloacaEditorMap.doubleClickZoom.disable():cloacaEditorMap.doubleClickZoom.enable(); }catch(e){} }
   if(!modo){ if(hint)hint.style.display='none'; if(btnN)btnN.style.display='none'; if(cloacaEditorMap)cloacaEditorMap.getContainer().style.cursor=''; return; }
   if(btnN)btnN.style.display='inline-block';
   if(cloacaEditorMap)cloacaEditorMap.getContainer().style.cursor='crosshair';
-  const msgs={tramo:'🟩 TRAMO — Click para agregar puntos. <b>Doble click</b> para terminar.',camara:'🔵 CÁMARA — Click en el mapa para colocar la cámara.',conexion:'🟠 CONEXIÓN — Click en el mapa para marcar la conexión.'};
+  const msgs={tramo:'🟩 TRAMO — Click para agregar puntos. <b>Doble click</b> para terminar.',camara:'🔵 CÁMARA — Click en el mapa para colocar la cámara.',conexion:'🟠 CONEXIÓN — Click en el mapa para marcar la conexión.','conexion-rapida':'⚡ RÁPIDO — Click tras click para agregar conexiones (se numeran solas). No hace falta guardar cada una.'};
   if(hint){hint.innerHTML=msgs[modo];hint.style.display='block';}
 }
 
@@ -6955,8 +6963,37 @@ function cloacaEditorRedibujarRed(){
 }
 
 function cloacaEditorOnClick(e){
+  // Modo MOVER: reubicar el punto seleccionado
+  if(_cloacaMoviendo){
+    L.DomEvent.stopPropagation(e);
+    _cloacaMoviendo.geometry.coordinates=[e.latlng.lng,e.latlng.lat];
+    _cloacaMoviendo.properties.fechaMod=new Date().toISOString().slice(0,10);
+    _cloacaGuardarYSync(false);
+    cloacaEditorRedibujarRed();
+    const mv=_cloacaMoviendo; _cloacaMoviendo=null;
+    if(cloacaEditorMap)cloacaEditorMap.getContainer().style.cursor='';
+    const hint=document.getElementById('cloaca-editor-hint'); if(hint)hint.style.display='none';
+    cloacaMostrarSeleccionado(mv, mv.properties&&mv.properties.tipo==='conexion_domiciliaria'?'conexion':'camara');
+    return;
+  }
   if(!cloacaEditorMode)return;
   L.DomEvent.stopPropagation(e);
+  // Modo RÁPIDO: agrega una conexión numerada sola, sin formulario
+  if(cloacaEditorMode==='conexion-rapida'){
+    const nro=_proximoNroConexion();
+    const feat={type:'Feature',geometry:{type:'Point',coordinates:[e.latlng.lng,e.latlng.lat]},properties:{tipo:'conexion_domiciliaria',nro:String(nro),handle:_generarHandle(),fechaMod:new Date().toISOString().slice(0,10),usuario:currentUser||'operador'}};
+    if(!geoCloacas)geoCloacas={type:'FeatureCollection',name:'cloacas_alcorta',features:[]};
+    geoCloacas.features.push(feat);
+    _cloacaGuardarYSync(true);
+    cloacaEditorUndoStack.push({tipo:'conexion',id:feat.properties.handle,label:'Conexión '+nro,fecha:new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'}),feat});
+    const btnU=document.getElementById('btn-undo-cloaca'); if(btnU){btnU.disabled=false;btnU.style.opacity='1';}
+    if(cloacaEditorLayers.camaras){ try{cloacaEditorLayers.camaras.addData(feat);}catch(err){cloacaEditorRedibujarRed();} } else cloacaEditorRedibujarRed();
+    _cloacaActualizarHistorial();
+    let _vmsg='';
+    try{ const cerca=_parcelaMasCercana(e.latlng.lat,e.latlng.lng); if(cerca&&cerca.rec){ _vincularConexionAPadron(feat.properties.handle,cerca.rec); _vmsg=' → Padrón <b>'+cerca.padron+'</b>'+(cerca.rec.titular?' ('+esc(cerca.rec.titular)+')':''); } }catch(err){}
+    const hint=document.getElementById('cloaca-editor-hint'); if(hint)hint.innerHTML='⚡ Conexión <b>'+nro+'</b>'+(_vmsg||' agregada')+'. Seguí clickeando para más.';
+    return;
+  }
   if(cloacaEditorMode==='camara'||cloacaEditorMode==='conexion'){
     _cloacaEditorPendiente={type:'Feature',geometry:{type:'Point',coordinates:[e.latlng.lng,e.latlng.lat]},properties:{tipo:cloacaEditorMode==='camara'?'boca_inspeccion':'conexion_domiciliaria',handle:_generarHandle(),fechaMod:new Date().toISOString().slice(0,10),usuario:currentUser||'operador'}};
     cloacaMostrarForm(cloacaEditorMode); return;
@@ -7011,6 +7048,25 @@ function cloacaGuardarElemento(){
   } else if(cloacaEditorMode==='conexion'){
     const n=document.getElementById('cf-nro-conexion').value.trim(); if(n)p.nro=n;
     const f2=document.getElementById('cf-fecha-conexion').value; if(f2)p.fechaInstalacion=f2;
+    if(!_cloacaModoEdicion){
+      try{
+        const c=feat.geometry&&feat.geometry.coordinates;
+        if(c){ const cerca=_parcelaMasCercana(c[1],c[0]);
+          if(cerca&&cerca.rec&&confirm('¿Vincular esta conexión al padrón '+cerca.padron+(cerca.rec.titular?' — '+cerca.rec.titular:'')+'?')){ _vincularConexionAPadron(p.handle,cerca.rec); }
+        }
+      }catch(err){}
+    }
+  }
+  // EDICIÓN: el elemento ya existe en geoCloacas (mismo objeto), solo actualizamos y guardamos
+  if(_cloacaModoEdicion){
+    p.fechaMod=new Date().toISOString().slice(0,10);
+    _cloacaGuardarYSync(false);
+    cloacaEditorRedibujarRed();
+    _cloacaModoEdicion=false; _cloacaEditorPendiente=null;
+    document.getElementById('cloaca-editor-form').style.display='none';
+    cloacaSetModo(null);
+    _cloacaActualizarHistorial();
+    return;
   }
   if(!geoCloacas)geoCloacas={type:'FeatureCollection',name:'cloacas_alcorta',features:[]};
   geoCloacas.features.push(feat);
@@ -7085,7 +7141,139 @@ function exportarGeoCloacasEditor(){
   const a=document.createElement('a'); a.href=url; a.download='cloacas_alcorta_'+new Date().toISOString().slice(0,10)+'.geojson'; a.click(); URL.revokeObjectURL(url);
 }
 
+function _proximoNroConexion(){
+  let max=0;
+  if(geoCloacas&&geoCloacas.features){
+    geoCloacas.features.forEach(f=>{ if(f.properties&&f.properties.tipo==='conexion_domiciliaria'){ const n=parseInt(f.properties.nro,10); if(!isNaN(n)&&n>max)max=n; } });
+  }
+  return max+1;
+}
+
+// Busca la parcela del catastro (con padrón vinculado) más cercana al punto clickeado
+function _parcelaMasCercana(lat,lng){
+  if(!geoData||!geoData.features||!geoLinks) return null;
+  const h2p={}; Object.keys(geoLinks).forEach(pad=>{ h2p[geoLinks[pad]]=pad; });
+  let best=null,bestD=Infinity;
+  geoData.features.forEach(f=>{
+    const h=f.properties&&f.properties.handle;
+    if(!h||!(h in h2p)) return;
+    let min=Infinity;
+    const scan=cs=>{ for(const c of cs){ if(typeof c[0]==='number'){const dx=c[0]-lng,dy=c[1]-lat,d=dx*dx+dy*dy; if(d<min)min=d;} else scan(c); } };
+    if(f.geometry&&f.geometry.coordinates) scan(f.geometry.coordinates);
+    if(min<bestD){ bestD=min; best={handle:h,padron:h2p[h]}; }
+  });
+  if(!best) return null;
+  best.rec=records.find(r=>String(r.padron)===String(best.padron))||null;
+  return best;
+}
+
+// Vincula una conexión (por su handle) a un padrón/parcela
+function _vincularConexionAPadron(connHandle, rec){
+  if(!rec||!connHandle) return;
+  cloacaGeoLinks[connHandle]={parcelaId:rec.id,ctaTasa:rec.ctaTasa,titular:rec.titular,padron:rec.padron,fecha:new Date().toISOString()};
+  try{saveCloacaGeoLinks();}catch(e){}
+}
+
+function _cloacaGuardarYSync(inmediato){
+  // Siempre guarda local al instante; el envío a Drive se puede diferir (modo rápido) para no saturar
+  try{localStorage.setItem('catastro_geo_cloacas',JSON.stringify(geoCloacas));}catch(e){}
+  const enviar=()=>{ try{subirGeoJSON('catastro_geo_cloacas',geoCloacas,'catastro_cloacas.geojson').then(()=>{});}catch(e){} };
+  if(_cloacaSyncTO){clearTimeout(_cloacaSyncTO);_cloacaSyncTO=null;}
+  if(inmediato===true){ _cloacaSyncTO=setTimeout(enviar,2500); } // diferido (rápido): junta varias en un envío
+  else { enviar(); }
+}
+
+function cloacaEditarSeleccionado(){
+  if(!_cloacaSelFeat){return;}
+  const feat=_cloacaSelFeat, p=feat.properties||{};
+  const esLinea=feat.geometry&&(feat.geometry.type==='LineString'||feat.geometry.type==='MultiLineString');
+  const tipo=esLinea?'tramo':(p.tipo==='conexion_domiciliaria'?'conexion':'camara');
+  _cloacaModoEdicion=true; _cloacaEditorPendiente=feat; cloacaEditorMode=tipo; _cloacaMoviendo=null;
+  document.getElementById('cloaca-editor-seleccionado').style.display='none';
+  cloacaMostrarForm(tipo);
+  document.getElementById('cloaca-form-titulo').textContent='✏️ Editar '+({tramo:'tramo colector',camara:'cámara',conexion:'conexión'}[tipo]||'');
+  document.getElementById('cf-obs').value=p.obs||'';
+  if(tipo==='tramo'){
+    if(p.subtipo)document.getElementById('cf-subtipo').value=p.subtipo;
+    if(p.diametro)document.getElementById('cf-diametro').value=p.diametro;
+    if(p.material)document.getElementById('cf-material').value=p.material;
+  } else if(tipo==='camara'){
+    if(p.tipo)document.getElementById('cf-tipo-camara').value=p.tipo;
+    document.getElementById('cf-nro-camara').value=p.nro||'';
+  } else if(tipo==='conexion'){
+    document.getElementById('cf-nro-conexion').value=p.nro||'';
+    document.getElementById('cf-fecha-conexion').value=p.fechaInstalacion||'';
+  }
+}
+
+function cloacaMoverSeleccionado(){
+  if(!_cloacaSelFeat)return;
+  if(!_cloacaSelFeat.geometry||_cloacaSelFeat.geometry.type!=='Point'){
+    alert('Por ahora solo se pueden mover puntos (cámaras y conexiones). Para reubicar un tramo, borralo y volvé a dibujarlo.');return;
+  }
+  _cloacaMoviendo=_cloacaSelFeat; cloacaEditorMode=null;
+  document.getElementById('cloaca-editor-seleccionado').style.display='none';
+  const hint=document.getElementById('cloaca-editor-hint'); if(hint){hint.innerHTML='✥ MOVER — Hacé click en el mapa en la <b>nueva ubicación</b> del punto.';hint.style.display='block';}
+  if(cloacaEditorMap)cloacaEditorMap.getContainer().style.cursor='crosshair';
+}
+
 function _generarHandle(){return 'cl_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);}
+
+// Centro aproximado de una parcela (promedio de sus vértices) → [lng,lat]
+function _centroideFeature(f){
+  let sx=0,sy=0,n=0;
+  const scan=cs=>{ for(const c of cs){ if(typeof c[0]==='number'){ sx+=c[0]; sy+=c[1]; n++; } else scan(c); } };
+  if(f&&f.geometry&&f.geometry.coordinates) scan(f.geometry.coordinates);
+  return n?[sx/n,sy/n]:null;
+}
+
+// Importa el detalle de cloacas (JSON) y coloca+vincula cada conexión automáticamente
+async function importarConexionesArchivo(input){
+  const file=input.files&&input.files[0]; if(!file)return;
+  let data;
+  try{ data=JSON.parse(await file.text()); }catch(e){ alert('No pude leer el archivo. Tiene que ser el JSON de importación de conexiones.'); input.value=''; return; }
+  if(!Array.isArray(data)){ alert('El archivo no tiene el formato esperado (debe ser una lista de conexiones).'); input.value=''; return; }
+  if(!geoData||!geoData.features){ alert('Primero tiene que estar cargado el plano del catastro (parcelas).'); input.value=''; return; }
+  if(!confirm('Se van a importar hasta '+data.length+' conexiones. Se colocan en el centro de cada parcela vinculada y se enlazan al padrón.\n\n¿Continuar?')){ input.value=''; return; }
+
+  const p2h={}; Object.keys(geoLinks).forEach(pad=>{ p2h[String(pad)]=geoLinks[pad]; });
+  const recByPadron={}; records.forEach(r=>{ recByPadron[String(r.padron)]=r; });
+  const feaByHandle={}; geoData.features.forEach(f=>{ if(f.properties&&f.properties.handle) feaByHandle[f.properties.handle]=f; });
+  const yaConectados=new Set();
+  Object.keys(cloacaGeoLinks).forEach(h=>{ const v=cloacaGeoLinks[h]; if(v&&v.padron) yaConectados.add(String(v.padron)); });
+
+  let creadas=0, sinMatch=0, sinGeo=0, yaTenia=0;
+  if(!geoCloacas)geoCloacas={type:'FeatureCollection',name:'cloacas_alcorta',features:[]};
+  data.forEach(row=>{
+    const padron=String(row.padron||'').trim(); if(!padron){sinMatch++;return;}
+    const rec=recByPadron[padron];
+    if(!rec){ sinMatch++; return; }
+    if(yaConectados.has(padron)){ yaTenia++; return; }
+    const handle=p2h[padron];
+    if(!handle||!feaByHandle[handle]){ sinGeo++; return; }
+    const cen=_centroideFeature(feaByHandle[handle]); if(!cen){ sinGeo++; return; }
+    const connHandle=_generarHandle();
+    const feat={type:'Feature',geometry:{type:'Point',coordinates:[cen[0],cen[1]]},properties:{tipo:'conexion_domiciliaria',nro:String(row.cuenta||''),cuentaCloaca:String(row.cuenta||''),estado:row.estado||'',obs:row.obs||'',handle:connHandle,importado:true,fechaMod:new Date().toISOString().slice(0,10),usuario:currentUser||'importacion'}};
+    geoCloacas.features.push(feat);
+    cloacaGeoLinks[connHandle]={parcelaId:rec.id,ctaTasa:rec.ctaTasa,titular:rec.titular,padron:rec.padron,cuentaCloaca:String(row.cuenta||''),fecha:new Date().toISOString()};
+    yaConectados.add(padron);
+    creadas++;
+  });
+  input.value='';
+  if(creadas>0){
+    try{localStorage.setItem('catastro_geo_cloacas',JSON.stringify(geoCloacas));}catch(e){}
+    try{saveCloacaGeoLinks();}catch(e){}
+    try{subirGeoJSON('catastro_geo_cloacas',geoCloacas,'catastro_cloacas.geojson').then(()=>{});}catch(e){}
+    try{cloacaEditorRedibujarRed();}catch(e){}
+    try{pushToDrive(true);}catch(e){} // para sincronizar los vínculos (cloacaGeoLinks van en el backup)
+  }
+  alert('📥 Importación terminada:\n\n'+
+    '✅ Conexiones creadas y vinculadas: '+creadas+'\n'+
+    'ℹ️ Padrones que ya tenían conexión (omitidos): '+yaTenia+'\n'+
+    '⚠️ Parcela sin vincular al mapa (no se pudo ubicar): '+sinGeo+'\n'+
+    '❌ Padrón no encontrado en el catastro: '+sinMatch+'\n\n'+
+    (sinGeo>0?'Las "sin vincular al mapa" necesitan que primero vincules esa parcela al plano; después reimportás y se agregan (no se duplican las ya hechas).':''));
+}
 
 // ── FIN EDITOR DE RED CLOACAL ─────────────────────────────────────────────────
 
