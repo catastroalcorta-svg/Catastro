@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v37</title>
+<title>Catastro Municipal — Alcorta v38</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1595,7 +1595,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v37</span>
+      <span class="hdr-logo">ALCORTA v38</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -8144,7 +8144,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v37)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v38)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
