@@ -8943,6 +8943,7 @@ function initMap(rec, handleExplicito){
     dbg.textContent='handle='+handle+' | lat='+lat.toFixed(4)+' lon='+lon.toFixed(4)+' zoom='+zoom+' | features='+(geoData&&geoData.features?geoData.features.length:0)+' | leafMap='+(leafMap?'ok':'null')+' | embebido='+(typeof GEOJSON_EMBEBIDO!=='undefined'?GEOJSON_EMBEBIDO.features.length:0);
   }
 
+  try{_inyectarParcelasDibujadas();}catch(e){}
   if(geoData&&geoData.features&&geoData.features.length>0){
     parcelLayer=L.geoJSON(geoData,{
       style:()=>({color:'#1d4ed8',weight:1.5,fillColor:'#bfdbfe',fillOpacity:0.3,opacity:0.9}),
@@ -9110,20 +9111,47 @@ function finalizarDraw(){
     return;
   }
   const latlngs=[...drawPuntos];
-  const nota=prompt('Nota para esta nueva parcela (ej: División Mz 45, Lote 3A):','');
-  if(nota===null){cancelarDraw();return;}
-  const np={id:'np_'+Date.now(), latlngs, nota:nota||'Sin nota', fecha:new Date().toISOString(), padronOrigen:curRec?curRec.padron:''};
+  const padron=curRec?String(curRec.padron):'';
+  const handle='DIV_'+Date.now();
+  // Guardar el dibujo (persiste local y se sincroniza dentro del backup como parcelasNuevas)
+  const np={id:'np_'+Date.now(), handle, padron, latlngs, nota:'División de padrón '+padron, fecha:new Date().toISOString(), padronOrigen:padron};
   parcelasNuevas.push(np);
   try{localStorage.setItem('catastro_parcelas_nuevas',JSON.stringify(parcelasNuevas));}catch(e){}
-  // Dibujar polígono final
-  if(drawnItems){
-    const layer=L.polygon(latlngs,{color:'#e05c00',fillColor:'#ffd166',fillOpacity:0.5,weight:2});
-    layer.bindPopup('<b>Nueva parcela</b><br>'+(nota||'Sin nota')+'<br><small>'+new Date().toLocaleDateString('es-AR')+'</small><br><button onclick="eliminarParcelaNueva(&quot;'+np.id+'&quot;)">🗑 Eliminar</button>');
-    drawnItems.addLayer(layer);
+  // Convertir el dibujo en una PARCELA REAL del mapa (feature con handle) para poder vincularla
+  const feature=_dibujoAFeature(np);
+  if(geoData&&geoData.features) geoData.features.push(feature);
+  if(parcelLayer){ try{parcelLayer.addData(feature);}catch(e){} }
+  // Vincular automáticamente el padrón activo a ESTA parcela dibujada (no al terreno entero)
+  let msg='✅ Parcela dibujada ('+latlngs.length+' vértices).';
+  if(padron){
+    geoLinks[padron]=handle;
+    saveGeoLinks();
+    if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(padron, handle);
+    msg='✅ Dibujada y vinculada al padrón '+padron+' (solo el pedazo dibujado, no el terreno entero).';
   }
   cancelarDraw();
+  if(handle) try{resaltarHandle(handle,true);}catch(e){}
   const st=document.getElementById('map-status');
-  if(st) st.textContent='✅ Nueva parcela guardada con '+latlngs.length+' vértices.';
+  if(st) st.textContent=msg;
+}
+
+// Convierte un dibujo (con latlngs [lat,lng]) en un Feature GeoJSON con handle
+function _dibujoAFeature(np){
+  const ring=(np.latlngs||[]).map(p=>[p[1],p[0]]); // GeoJSON usa [lng,lat]
+  if(ring.length && (ring[0][0]!==ring[ring.length-1][0]||ring[0][1]!==ring[ring.length-1][1])) ring.push(ring[0]);
+  return {type:'Feature',properties:{handle:np.handle,dibujada:true,padron:np.padron||''},geometry:{type:'Polygon',coordinates:[ring]}};
+}
+
+// Inyecta las parcelas dibujadas en geoData para que sigan vinculables tras recargar
+function _inyectarParcelasDibujadas(){
+  if(!geoData||!geoData.features||!Array.isArray(parcelasNuevas)) return;
+  const existentes=new Set(geoData.features.map(f=>f&&f.properties&&f.properties.handle));
+  parcelasNuevas.forEach(np=>{
+    if(np&&np.handle&&np.latlngs&&np.latlngs.length>=3&&!existentes.has(np.handle)){
+      geoData.features.push(_dibujoAFeature(np));
+      existentes.add(np.handle);
+    }
+  });
 }
 
 function toggleDraw(){
