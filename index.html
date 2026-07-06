@@ -7951,6 +7951,7 @@ function buildMapHTML(){
       ${geoCloacas&&isAdmin?`<button class="btn btn-sm" onclick="goCloacaVincular()" style="background:#1a7a4a;color:#fff;border-color:#1a7a4a">🚰 Vincular cloacas</button>`:''}
       ${isAdmin?`<button class="btn btn-sm" onclick="goCloacaEditor()" style="background:#0d6efd;color:#fff;border-color:#0d6efd">✏️ Editar red</button>`:''}
       <button class="btn btn-sm" id="btn-draw" onclick="toggleDraw()" style="background:#8e44ad;color:#fff;border-color:#8e44ad">✏️ Dibujar división</button>
+      <button class="btn btn-sm" id="btn-borrar-dibujo" onclick="borrarDibujoActual()" style="background:#dc2626;color:#fff;border-color:#dc2626;margin-left:6px">🗑 Borrar dibujo</button>
       <button class="btn btn-sm" onclick="activarBusquedaPoligono()" title="Dibujá un polígono y listar las parcelas dentro" style="background:#0369a1;color:#fff;border-color:#0369a1">🔍 Buscar en área</button>
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
@@ -9128,6 +9129,7 @@ function finalizarDraw(){
     saveGeoLinks();
     if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(padron, handle);
     msg='✅ Dibujada y vinculada al padrón '+padron+' (solo el pedazo dibujado, no el terreno entero).';
+    try{ if(_agregarLoteAManzana(handle, curRec?curRec.manzana:'')) msg+=' Agregada a la Mz '+String(curRec.manzana||'').trim()+'.'; }catch(e){}
   }
   cancelarDraw();
   if(handle) try{resaltarHandle(handle,true);}catch(e){}
@@ -9152,6 +9154,48 @@ function _inyectarParcelasDibujadas(){
       existentes.add(np.handle);
     }
   });
+}
+
+// Agrega el handle de una parcela dibujada a su manzana (por número de manzana)
+function _agregarLoteAManzana(handle, mzNumRaw){
+  const mzNum=String(mzNumRaw||'').trim();
+  if(!mzNum||!Array.isArray(mzData)) return false;
+  const mz=mzData.find(m=>String(mzLinks[m.handle]||'').trim()===mzNum);
+  if(!mz) return false;
+  if(!Array.isArray(mz.lotes)) mz.lotes=[];
+  if(!mz.lotes.includes(handle)){
+    mz.lotes.push(handle);
+    try{localStorage.setItem(MZ_DATA_KEY,JSON.stringify(mzData));}catch(e){}
+  }
+  return true;
+}
+
+// Borra el dibujo de la parcela del padrón activo (para rehacer si te equivocaste)
+function borrarDibujoActual(){
+  if(drawModo) cancelarDraw();
+  if(!curRec||!curRec.padron){alert('Abrí primero el padrón cuyo dibujo querés borrar.');return;}
+  const padron=String(curRec.padron);
+  const handle=geoLinks[padron];
+  let idx=parcelasNuevas.findIndex(np=>np&&(np.handle===handle||(np.padron&&String(np.padron)===padron)));
+  const h=handle||(idx>=0?parcelasNuevas[idx].handle:'');
+  if(!h && idx<0){alert('Esta parcela no tiene un dibujo para borrar.');return;}
+  if(!confirm('¿Borrar el dibujo de la parcela del padrón '+padron+'?\nSe quita el polígono, su vínculo y su lugar en la manzana.'))return;
+  // 1) parcelasNuevas
+  if(idx>=0) parcelasNuevas.splice(idx,1);
+  if(h) parcelasNuevas=parcelasNuevas.filter(np=>!(np&&np.handle===h));
+  try{localStorage.setItem('catastro_parcelas_nuevas',JSON.stringify(parcelasNuevas));}catch(e){}
+  // 2) feature del plano
+  if(h&&geoData&&geoData.features){ geoData.features=geoData.features.filter(f=>!(f.properties&&f.properties.handle===h)); }
+  // 3) capa del mapa
+  if(h&&parcelLayer){ try{parcelLayer.eachLayer(l=>{ if(l.feature&&l.feature.properties&&l.feature.properties.handle===h) parcelLayer.removeLayer(l); });}catch(e){} }
+  if(curParcelLayer){try{leafMap.removeLayer(curParcelLayer);}catch(e){}curParcelLayer=null;}
+  // 4) manzana
+  if(h&&Array.isArray(mzData)){ let toc=false; mzData.forEach(mz=>{ if(Array.isArray(mz.lotes)&&mz.lotes.includes(h)){ mz.lotes=mz.lotes.filter(x=>x!==h); toc=true; } }); if(toc){try{localStorage.setItem(MZ_DATA_KEY,JSON.stringify(mzData));}catch(e){}} }
+  // 5) vínculo
+  if(geoLinks[padron]===h){ delete geoLinks[padron]; saveGeoLinks(); if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(padron,''); }
+  if(leafMap) try{leafMap.setView([-33.5403,-61.1221],16);}catch(e){}
+  const st=document.getElementById('map-status'); if(st) st.textContent='🗑 Dibujo borrado del padrón '+padron+'. Podés volver a dibujarlo.';
+  alert('✅ Dibujo borrado. Ya podés dibujarlo de nuevo.');
 }
 
 function toggleDraw(){
