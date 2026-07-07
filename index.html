@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v38</title>
+<title>Catastro Municipal — Alcorta v39</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1595,7 +1595,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v38</span>
+      <span class="hdr-logo">ALCORTA v39</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -8145,7 +8145,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v38)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v39)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
@@ -10137,52 +10137,20 @@ async function subirGeoJSON(key, data, archivo){
   if(!DRIVE_API_URL||!DRIVE_TOKEN) return false;
   const json = typeof data === 'string' ? data : JSON.stringify(data);
   const version = new Date().toISOString();
-  // Subir via form POST simple — sin intentar leer respuesta del iframe (bloqueado en file://)
-  return new Promise(resolve=>{
-    const cbName='_geoUp_'+Math.random().toString(36).slice(2);
-    const iframe=document.createElement('iframe');
-    iframe.name=cbName+'_frame';
-    iframe.style.display='none';
-    document.body.appendChild(iframe);
-    const form=document.createElement('form');
-    form.method='POST';
-    form.action=DRIVE_API_URL;
-    form.target=cbName+'_frame';
-    form.style.display='none';
-    const addField=(n,v)=>{
-      const i=document.createElement('input');
-      i.type='hidden'; i.name=n; i.value=v;
-      form.appendChild(i);
-    };
-    addField('token',DRIVE_TOKEN);
-    addField('archivo',archivo);
-    addField('data',json);
-    document.body.appendChild(form);
-    const cleanup=()=>{
-      try{document.body.removeChild(form);}catch(_){}
-      try{document.body.removeChild(iframe);}catch(_){}
-    };
-    // No intentar leer iframe.contentDocument — da 403 desde file://
-    // Considerar exitoso después de que el iframe cargue o timeout
-    iframe.onload=()=>{
-      cleanup();
-      localStorage.setItem('catastro_geo_version_'+key, version);
-      console.log('[subirGeoJSON] OK: '+archivo+' ('+Math.round(json.length/1024)+'KB)');
-      resolve(true);
-    };
-    iframe.onerror=()=>{
-      cleanup();
-      localStorage.setItem('catastro_geo_version_'+key, version);
-      resolve(true); // asumir OK igual — el form llegó
-    };
-    form.submit();
-    // Timeout de seguridad
-    setTimeout(()=>{
-      cleanup();
-      localStorage.setItem('catastro_geo_version_'+key, version);
-      resolve(true);
-    },20000);
-  });
+  // Envío CONFIABLE: fetch no-cors + text/plain (lo parsea doPost por e.postData).
+  // accion 'guardarArchivo' NO coincide con 'guardarTodo', así el backend cae en el
+  // branch de escritura de archivo arbitrario (p.archivo + p.data) y NUNCA toca el backup.
+  const body = JSON.stringify({token:DRIVE_TOKEN, accion:'guardarArchivo', archivo:archivo, data:json});
+  try{
+    await fetch(DRIVE_API_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body});
+    await new Promise(r=>setTimeout(r,900));
+    localStorage.setItem('catastro_geo_version_'+key, version);
+    console.log('[subirGeoJSON] enviado: '+archivo+' ('+Math.round(json.length/1024)+'KB)');
+    return true;
+  }catch(e){
+    console.warn('[subirGeoJSON] error enviando '+archivo+':', e);
+    return false;
+  }
 }
 
 // checkGeoVersion y bajarGeoJSON usan JSONP (igual que pullFromDrive) para evitar
