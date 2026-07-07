@@ -1622,6 +1622,7 @@ function topnav(act){
     ${puedoVer('manzanas')?`<button class="tn-btn ${act==='manzanas'?'active':''}" onclick="goManzanas()">🗺 Manzanas</button>`:''}
     ${puedoVer('calles')?`<button class="tn-btn ${act==='calles'?'active':''}" onclick="goCalles()">🛣️ Calles</button>`:''}
     ${puedoVer('rural')?`<button class="tn-btn ${act==='rural'?'active':''}" onclick="goRural()">🌾 Rural</button>`:''}
+    ${isAdmin?`<button class="tn-btn ${act==='cloaca-editor'?'active':''}" onclick="goCloacaEditor()">🚰 Cloacas</button>`:''}
     ${puedoVer('operaciones')?`<button class="tn-btn ${act==='operaciones'?'active':''}" onclick="goOperaciones()">✂️ Unif/Div</button>`:''}
     ${puedoEditar('parcelas')?`<button class="tn-btn ${act==='form'?'active':''}" onclick="openForm(null)">+ Nueva</button>`:''}
     ${puedoVer('ajustes')?`<button class="tn-btn ${act==='ajustes'?'active':''}" onclick="goAjustes()">⚙️ Ajustes</button>`:''}
