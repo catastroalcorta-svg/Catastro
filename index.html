@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v39</title>
+<title>Catastro Municipal — Alcorta v40</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -516,9 +516,8 @@ function loadData(){
       }
     },200);
   }
-  if(!tieneDrive){
-    try{const gc=localStorage.getItem('catastro_geo_cloacas');if(gc){const _gc=JSON.parse(gc);if(_gc&&_gc.features&&_gc.features.length>0)geoCloacas=_gc;}else{geoCloacas=null;}}catch(e){geoCloacas=null;}
-  }
+  // Cargar cloacas desde localStorage como base (con o sin Drive). El sync luego actualiza con guardia por cantidad.
+  try{const gc=localStorage.getItem('catastro_geo_cloacas');if(gc){const _gc=JSON.parse(gc);if(_gc&&_gc.features&&_gc.features.length>0)geoCloacas=_gc;}}catch(e){}
 
   // Vínculos del mapa catastral (geoLinks): con Drive vienen de Drive
   if(!tieneDrive){
@@ -1595,7 +1594,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v39</span>
+      <span class="hdr-logo">ALCORTA v40</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -8145,7 +8144,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v39)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v40)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
@@ -10205,6 +10204,18 @@ function bajarGeoJSON(archivo, storageKey, onSuccess){
   document.head.appendChild(s);
 }
 
+// Guardia: nunca reemplazar las cloacas locales por una versión de Drive con muchas menos (protege lo cargado)
+function _setGeoCloacasGuarded(data){
+  const driveN=(data&&data.features)?data.features.length:0;
+  const localN=(geoCloacas&&geoCloacas.features)?geoCloacas.features.length:0;
+  if(localN>0 && driveN < localN*0.9){
+    console.warn('[Cloacas] Drive='+driveN+' < local='+localN+' → NO se pisa lo local; se re-sube a Drive.');
+    try{subirGeoJSON('catastro_geo_cloacas',geoCloacas,'catastro_cloacas.geojson');}catch(e){}
+    return;
+  }
+  if(data) geoCloacas=data;
+}
+
 function sincronizarGeoJSON(forzar=false, onDone=null){
   if(!DRIVE_API_URL||!DRIVE_TOKEN){ if(onDone)onDone(0); return; }
   let pendientes = GEO_FILES.length;
@@ -10231,7 +10242,7 @@ function sincronizarGeoJSON(forzar=false, onDone=null){
           actualizados++;
           // Actualizar variable en memoria
           if(gf.key==='catastro_geo'&&data&&data.features&&data.features.length>0) geoData=data;
-          else if(gf.key==='catastro_geo_cloacas'&&data) geoCloacas=data;
+          else if(gf.key==='catastro_geo_cloacas'&&data) _setGeoCloacasGuarded(data);
           else if(gf.key==='catastro_mz_data'&&data&&data.length>0) mzData=data;
           else if(gf.key==='catastro_rural_geo'&&data&&data.features&&data.features.length>0) ruralGeo=data;
         }
@@ -10251,7 +10262,7 @@ function sincronizarGeoJSON(forzar=false, onDone=null){
             if(ok){
               actualizados++;
               if(gf.key==='catastro_geo'&&data&&data.features&&data.features.length>0) geoData=data;
-              else if(gf.key==='catastro_geo_cloacas'&&data) geoCloacas=data;
+              else if(gf.key==='catastro_geo_cloacas'&&data) _setGeoCloacasGuarded(data);
               else if(gf.key==='catastro_mz_data'&&data&&data.length>0) mzData=data;
               else if(gf.key==='catastro_rural_geo'&&data&&data.features&&data.features.length>0) ruralGeo=data;
             }
@@ -10272,7 +10283,7 @@ function sincronizarGeoJSON(forzar=false, onDone=null){
           actualizados++;
           localStorage.setItem('catastro_geo_version_'+gf.key, driveVersion);
           if(gf.key==='catastro_geo'&&data&&data.features&&data.features.length>0) geoData=data;
-          else if(gf.key==='catastro_geo_cloacas'&&data) geoCloacas=data;
+          else if(gf.key==='catastro_geo_cloacas'&&data) _setGeoCloacasGuarded(data);
           else if(gf.key==='catastro_mz_data'&&data&&data.length>0) mzData=data;
           else if(gf.key==='catastro_rural_geo'&&data&&data.features&&data.features.length>0) ruralGeo=data;
         }
