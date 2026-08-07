@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c5c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Planta Cloacal">
+<title>Planta Cloacal · Comuna de Alcorta</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --agua-900:#0b3a45; --agua-800:#0f4c5c; --agua-700:#146b7a; --agua-600:#1a8a9c;
+  --agua-500:#24a6b8; --agua-300:#7fd0da; --agua-100:#e2f4f6;
+  --tinta:#0d2a30; --gris:#5b6b6f; --linea:#d5e2e4; --panel:#ffffff; --fondo:#eef4f5;
+  --verde:#1f9d55; --verde-bg:#e4f6ec;
+  --amarillo:#c9960b; --amarillo-bg:#fbf3d9;
+  --naranja:#d9691a; --naranja-bg:#fce8d6;
+  --rojo:#c0392b; --rojo-bg:#fbe3e0;
+  --sombra:0 1px 3px rgba(11,58,69,.10),0 6px 18px rgba(11,58,69,.06);
+  --radio:12px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--fondo);color:var(--tinta);font-size:14.5px;line-height:1.45}
+h1,h2,h3{margin:0;font-weight:650}
+a{color:var(--agua-600)}
+button{font-family:inherit;cursor:pointer}
+.app{display:flex;min-height:100vh}
+/* ---- Sidebar ---- */
+.side{width:238px;background:linear-gradient(180deg,var(--agua-900),var(--agua-800));color:#dff1f3;flex-shrink:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.10)}
+.brand .esc{font-size:22px}
+.brand h1{font-size:15px;color:#fff;line-height:1.25;margin-top:6px}
+.brand small{color:var(--agua-300);font-size:11.5px;letter-spacing:.3px}
+.nav{padding:8px;overflow-y:auto;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;color:#cfe8eb;padding:9px 11px;border-radius:9px;font-size:13.3px;margin-bottom:1px;transition:.12s}
+.nav button .ic{width:20px;text-align:center;opacity:.9}
+.nav button:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav button.on{background:var(--agua-500);color:#fff;font-weight:600;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+.nav .sep{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--agua-300);padding:12px 12px 5px;opacity:.75}
+.side .pie{padding:10px 14px;font-size:11px;color:var(--agua-300);border-top:1px solid rgba(255,255,255,.10)}
+/* ---- Main ---- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--panel);border-bottom:1px solid var(--linea);padding:12px 26px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+.topbar .reloj{font-size:13px;color:var(--gris)}
+.topbar .reloj b{color:var(--tinta)}
+.content{padding:22px 26px 60px;max-width:1180px;width:100%}
+.view-title{font-size:20px;margin-bottom:2px}
+.view-sub{color:var(--gris);font-size:13px;margin-bottom:18px}
+/* ---- Cards / grid ---- */
+.grid{display:grid;gap:14px}
+.g-4{grid-template-columns:repeat(4,1fr)}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--panel);border:1px solid var(--linea);border-radius:var(--radio);padding:16px;box-shadow:var(--sombra)}
+.kpi{position:relative;overflow:hidden}
+.kpi .lbl{font-size:12px;color:var(--gris);text-transform:uppercase;letter-spacing:.4px}
+.kpi .val{font-size:27px;font-weight:700;margin-top:4px;line-height:1}
+.kpi .val small{font-size:13px;font-weight:500;color:var(--gris)}
+.kpi .foot{font-size:11.5px;color:var(--gris);margin-top:6px}
+/* ---- Semáforo ---- */
+.semaforo{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:var(--radio);color:#fff;box-shadow:var(--sombra)}
+.semaforo .luz{width:54px;height:54px;border-radius:50%;flex-shrink:0;box-shadow:inset 0 0 0 3px rgba(255,255,255,.35),0 0 22px rgba(255,255,255,.25)}
+.semaforo h2{font-size:20px}
+.semaforo p{margin:2px 0 0;opacity:.92;font-size:13px}
+.s-verde{background:linear-gradient(120deg,#1f9d55,#127a41)} .s-verde .luz{background:#7ef0a8}
+.s-amarillo{background:linear-gradient(120deg,#d6a413,#b0850a)} .s-amarillo .luz{background:#ffe27a}
+.s-naranja{background:linear-gradient(120deg,#e0721f,#bd5714)} .s-naranja .luz{background:#ffc182}
+.s-rojo{background:linear-gradient(120deg,#d0392b,#a12a1f)} .s-rojo .luz{background:#ff9a8e}
+/* ---- Chips estado ---- */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.c-verde{background:var(--verde-bg);color:var(--verde)}
+.c-amarillo{background:var(--amarillo-bg);color:var(--amarillo)}
+.c-naranja{background:var(--naranja-bg);color:var(--naranja)}
+.c-rojo{background:var(--rojo-bg);color:var(--rojo)}
+.c-gris{background:#eceff0;color:var(--gris)}
+/* ---- Tablas ---- */
+.tabla-wrap{background:var(--panel);border:1px solid var(--linea);border-radius:var(--radio);box-shadow:var(--sombra);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13.2px}
+thead th{background:#f3f8f9;text-align:left;padding:10px 12px;font-weight:600;color:var(--agua-800);border-bottom:1px solid var(--linea);white-space:nowrap;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+tbody td{padding:9px 12px;border-bottom:1px solid #eef3f4;vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#f7fbfb}
+.t-acc{display:flex;gap:6px}
+.mini{background:none;border:1px solid var(--linea);color:var(--gris);border-radius:7px;padding:3px 8px;font-size:12px}
+.mini:hover{border-color:var(--agua-500);color:var(--agua-700)}
+.mini.del:hover{border-color:var(--rojo);color:var(--rojo)}
+.vacio{padding:34px;text-align:center;color:var(--gris)}
+.vacio .em{font-size:30px;display:block;margin-bottom:8px;opacity:.55}
+/* ---- Botones ---- */
+.btn{background:var(--agua-600);color:#fff;border:0;border-radius:9px;padding:9px 15px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:.12s}
+.btn:hover{background:var(--agua-700)}
+.btn.sec{background:#fff;color:var(--agua-700);border:1px solid var(--linea)}
+.btn.sec:hover{border-color:var(--agua-500);background:#f7fbfb}
+.btn.ghost{background:transparent;color:var(--gris);border:1px solid var(--linea)}
+.head-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filtros select,.filtros input{padding:7px 10px;border:1px solid var(--linea);border-radius:8px;font-size:13px;background:#fff;color:var(--tinta)}
+/* ---- Form / modal ---- */
+.modal-bg{position:fixed;inset:0;background:rgba(11,42,48,.5);display:none;align-items:flex-start;justify-content:center;z-index:60;padding:34px 16px;overflow-y:auto}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:pop .16s ease}
+@keyframes pop{from{transform:translateY(8px);opacity:.6}to{transform:none;opacity:1}}
+.modal header{padding:16px 20px;border-bottom:1px solid var(--linea);display:flex;justify-content:space-between;align-items:center}
+.modal header h3{font-size:16px;color:var(--agua-800)}
+.modal .x{background:none;border:0;font-size:20px;color:var(--gris);line-height:1}
+.modal .body{padding:18px 20px;max-height:64vh;overflow-y:auto}
+.modal footer{padding:14px 20px;border-top:1px solid var(--linea);display:flex;justify-content:flex-end;gap:9px}
+.f-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.f-1{grid-template-columns:1fr}
+label.fld{display:block;font-size:12.5px}
+label.fld span{display:block;color:var(--gris);margin-bottom:4px;font-weight:600}
+label.fld input,label.fld select,label.fld textarea{width:100%;padding:8px 10px;border:1px solid var(--linea);border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff}
+label.fld textarea{resize:vertical;min-height:64px}
+label.fld input:focus,label.fld select:focus,label.fld textarea:focus{outline:2px solid var(--agua-300);border-color:var(--agua-500)}
+.hint{font-size:11.5px;color:var(--gris);margin-top:2px}
+/* ---- Aviso dashboard ---- */
+.aviso{padding:14px 18px;border-radius:var(--radio);display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;font-size:14px}
+.aviso.rojo{background:var(--rojo-bg);color:#7a1c14;border:1px solid #f0b8b1}
+.aviso.naranja{background:var(--naranja-bg);color:#7a3a10;border:1px solid #f0c39c}
+.aviso.amarillo{background:var(--amarillo-bg);color:#6b5209;border:1px solid #e8d38a}
+.aviso .big{font-size:22px;line-height:1}
+.aviso ul{margin:6px 0 0;padding-left:18px}
+/* ---- Config ---- */
+.cfg-sect{margin-bottom:22px}
+.cfg-sect h3{font-size:14px;color:var(--agua-800);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--linea)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+/* checklist operacion */
+.chk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.chk-item{border:1px solid var(--linea);border-radius:10px;padding:10px 12px;background:#fff}
+.chk-item .nm{font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:space-between}
+.chk-item input[type=text]{width:100%;margin-top:6px;padding:5px 7px;border:1px solid var(--linea);border-radius:6px;font-size:12px}
+.toggle{display:inline-flex;border:1px solid var(--linea);border-radius:7px;overflow:hidden}
+.toggle button{border:0;background:#fff;padding:3px 8px;font-size:11.5px;color:var(--gris)}
+.toggle button.on-ok{background:var(--verde);color:#fff}
+.toggle button.on-no{background:var(--rojo);color:#fff}
+.bita-line{padding:8px 0;border-bottom:1px solid #eef3f4}
+.bita-line .meta{font-size:11.5px;color:var(--gris)}
+.badge-count{background:var(--agua-500);color:#fff;font-size:10.5px;padding:0 6px;border-radius:10px;margin-left:auto}
+.print-only{display:none}
+/* barra inferior móvil */
+.mobnav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:70;background:#fff;border-top:1px solid var(--linea);box-shadow:0 -2px 12px rgba(11,58,69,.08);padding-bottom:env(safe-area-inset-bottom)}
+.mobnav .row{display:flex}
+.mobnav button{flex:1;background:none;border:0;padding:7px 2px 6px;color:var(--gris);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;font-weight:600}
+.mobnav button .ic{font-size:20px;line-height:1}
+.mobnav button.on{color:var(--agua-600)}
+.side-backdrop{display:none;position:fixed;inset:0;background:rgba(11,42,48,.45);z-index:79}
+.side-backdrop.show{display:block}
+.fab{display:none}
+@media print{
+  .side,.topbar,.no-print,.nav,.head-row .btn,.toolbar,.filtros,.mobnav,.side-backdrop{display:none!important}
+  .main{display:block}.content{padding:0;max-width:none}
+  body{background:#fff;font-size:12px}
+  .print-only{display:block}
+  .card,.tabla-wrap{box-shadow:none;border:1px solid #ccc;break-inside:avoid}
+  h2,h3{break-after:avoid}
+}
+@media(max-width:920px){
+  .side{position:fixed;left:-280px;top:0;z-index:80;transition:.2s;width:270px} .side.show{left:0}
+  .g-4{grid-template-columns:repeat(2,1fr)} .g-3{grid-template-columns:1fr} .g-2{grid-template-columns:1fr}
+  .burger{display:inline-flex!important}
+  .mobnav{display:block}
+  .content{padding:16px 14px calc(84px + env(safe-area-inset-bottom))} /* espacio para la barra inferior */
+  .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px}
+  .view-title{font-size:18px}
+  /* formularios y tablas cómodos con el pulgar */
+  .f-row{grid-template-columns:1fr!important}
+  label.fld input,label.fld select,label.fld textarea,.filtros input,.filtros select{font-size:16px;padding:11px 12px} /* 16px evita el zoom de iOS */
+  .tabla-wrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+  table{min-width:560px}
+  .mini{padding:7px 11px;font-size:13px}
+  .btn{padding:11px 16px}
+  .t-acc{flex-direction:column}
+  /* modal a pantalla completa */
+  .modal-bg{padding:0;align-items:stretch}
+  .modal{max-width:none;border-radius:0;min-height:100vh;display:flex;flex-direction:column}
+  .modal .body{max-height:none;flex:1}
+  .modal footer{position:sticky;bottom:0;background:#fff}
+  .modal footer .btn{flex:1;justify-content:center}
+  .chk-grid{grid-template-columns:1fr}
+  .chk-item .toggle button{padding:7px 14px;font-size:13px}
+  .semaforo .luz{width:44px;height:44px}
+  .kpi .val{font-size:23px}
+  .qa-grid{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:420px){ .g-4{grid-template-columns:1fr 1fr} }
+.burger{display:none;background:var(--agua-600);color:#fff;border:0;border-radius:8px;padding:7px 11px;font-size:16px;margin-right:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="side" id="side">
+    <div class="brand">
+      <div class="esc">💧</div>
+      <h1>Planta Cloacal</h1>
+      <small id="brandLoc">Comuna de Alcorta</small>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="sep">Control</div>
+      <button data-v="dashboard" class="on"><span class="ic">📊</span> Panel de control</button>
+      <button data-v="agenda"><span class="ic">📅</span> Agenda de análisis</button>
+      <button data-v="estadisticas"><span class="ic">📈</span> Estadísticas</button>
+      <div class="sep">Registros</div>
+      <button data-v="analisis"><span class="ic">🧪</span> Registro de análisis</button>
+      <button data-v="operacion"><span class="ic">✅</span> Operación diaria</button>
+      <button data-v="lagunas"><span class="ic">🌊</span> Lagunas (Anexo I)</button>
+      <button data-v="bitacora"><span class="ic">📖</span> Bitácora diaria</button>
+      <div class="sep">Gestión</div>
+      <button data-v="mantenimiento"><span class="ic">🔧</span> Mantenimiento</button>
+      <button data-v="inventario"><span class="ic">📦</span> Inventario</button>
+      <button data-v="incidentes"><span class="ic">⚠️</span> Incidentes</button>
+      <button data-v="camiones"><span class="ic">🚚</span> Camiones atmosféricos</button>
+      <button data-v="inspecciones"><span class="ic">🏛️</span> Inspecciones ENRESS</button>
+      <div class="sep">Salida</div>
+      <button data-v="documentacion"><span class="ic">📁</span> Documentación</button>
+      <button data-v="informe"><span class="ic">🖨️</span> Informe ENRESS</button>
+      <button data-v="config"><span class="ic">⚙️</span> Configuración</button>
+    </nav>
+    <div class="pie">v1.1 · <a href="#" id="linkBackup" style="color:#7fd0da">Copia de seguridad</a></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center">
+        <button class="burger" onclick="toggleSide(true)">☰</button>
+        <div class="reloj" id="reloj">—</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center" class="no-print">
+        <span id="syncPill" class="chip c-gris" style="cursor:pointer" title="Sincronizar ahora" onclick="doSync('manual')">○ —</span>
+        <button class="btn sec" onclick="exportarJSON()">⬇︎ Backup</button>
+        <button class="btn sec" onclick="document.getElementById('importFile').click()">⬆︎ Restaurar</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importarJSON(event)">
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<!-- Fondo oscuro del menú lateral (móvil) -->
+<div class="side-backdrop" id="sideBackdrop" onclick="toggleSide(false)"></div>
+
+<!-- Barra inferior de accesos rápidos (móvil) -->
+<nav class="mobnav">
+  <div class="row">
+    <button data-v="dashboard" class="on" onclick="ir('dashboard')"><span class="ic">🏠</span>Inicio</button>
+    <button data-v="bitacora" onclick="ir('bitacora')"><span class="ic">📖</span>Bitácora</button>
+    <button data-v="operacion" onclick="ir('operacion')"><span class="ic">✅</span>Operación</button>
+    <button data-v="incidentes" onclick="ir('incidentes')"><span class="ic">⚠️</span>Incidentes</button>
+    <button onclick="toggleSide(true)"><span class="ic">☰</span>Más</button>
+  </div>
+</nav>
+
+<!-- Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <header><h3 id="modalTitle">—</h3><button class="x" onclick="cerrarModal()">✕</button></header>
+    <div class="body" id="modalBody"></div>
+    <footer>
+      <button class="btn ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn" id="modalSave">Guardar</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Sistema de Gestión de la Planta Cloacal – Comuna de Alcorta
+   Basado en el Reglamento de Control de Calidad para Servicios
+   Públicos de Desagües Cloacales (ENRESS, Anexo Único Res. 169/2026).
+   ============================================================ */
+const KEY="plantaCloacalAlcorta_v1";
+/* ▼▼▼ OPCIONAL: pegá acá la URL del backend (Apps Script /exec) entre las comillas.
+   Si la ponés, TODOS los que abran la app quedan conectados a Drive sin configurar nada.
+   Ejemplo: const SYNC_URL_DEFAULT="https://script.google.com/macros/s/AKfyc.../exec"; */
+const SYNC_URL_DEFAULT="";
+const hoy=()=>new Date();
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const fmtF=d=>d?new Date(d+"T00:00:00").toLocaleDateString("es-AR"):"—";
+const num=n=>Number(n).toLocaleString("es-AR");
+const diasEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/86400000);
+const addDias=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+const isoDate=d=>{const x=new Date(d);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");};
+
+/* ---------- Estado inicial ---------- */
+function estadoInicial(){
+  return {
+    config:{
+      localidad:"Comuna de Alcorta", prestador:"Comuna de Alcorta",
+      poblacion:8000, conexiones:5000,
+      tratamiento:"Lagunas de estabilización",
+      cloracion:true, biosolidos:false, terciario:false,
+      frec:{minima:60, completa:120, biosolidos:180, inspeccion:180}, // días
+      umbral:{amarillo:30, naranja:10},
+      carpeta:"", diaCeroIncidentes:isoDate(hoy()),
+      syncUrl:"", _upd:0
+    },
+    limites:limitesDefault(), _limitesUpd:0, _deleted:[],
+    analisis:[], operacion:[], equipos:[], incidentes:[],
+    camiones:[], inspecciones:[], lagunas:[], inventario:[], bitacora:[]
+  };
+}
+function limitesDefault(){
+  // Valores EDITABLES. Verificar contra Anexo B de la Ley 11220.
+  // SST flexibilizado a 120 mg/l para lagunas (explícito en el reglamento).
+  return [
+    {param:"Temperatura", uni:"°C", min:null, max:45, clase:"minima"},
+    {param:"pH", uni:"", min:6.5, max:9.0, clase:"minima"},
+    {param:"DQO", uni:"mg/l", min:null, max:250, clase:"minima"},
+    {param:"Coliformes Totales", uni:"NMP/100ml", min:null, max:10000, clase:"minima"},
+    {param:"Coliformes Fecales", uni:"NMP/100ml", min:null, max:5000, clase:"minima"},
+    {param:"DBO", uni:"mg/l", min:null, max:50, clase:"completa"},
+    {param:"Sólidos Suspendidos Totales", uni:"mg/l", min:null, max:120, clase:"completa"},
+    {param:"Amoníaco", uni:"mg/l", min:null, max:25, clase:"completa"},
+    {param:"Sulfuros", uni:"mg/l", min:null, max:1, clase:"completa"},
+    {param:"Grasas totales", uni:"mg/l", min:null, max:100, clase:"completa"},
+    {param:"Cloro residual", uni:"mg/l", min:0.2, max:2, clase:"cloro"}
+  ];
+}
+let S=cargar();
+function cargar(){
+  let s;
+  try{const r=localStorage.getItem(KEY);s=r?Object.assign(estadoInicial(),JSON.parse(r)):estadoInicial();}catch(e){s=estadoInicial();}
+  if((!s.config.syncUrl||s.config.syncUrl==="")&&SYNC_URL_DEFAULT)s.config.syncUrl=SYNC_URL_DEFAULT;
+  return s;
+}
+function guardar(){localStorage.setItem(KEY,JSON.stringify(S));scheduleSync();}
+
+/* ---------- Tipos de análisis ---------- */
+const TIPOS=[
+  {id:"minima", nom:"Caracterización mínima", frecKey:"minima"},
+  {id:"completa", nom:"Caracterización completa", frecKey:"completa"},
+  {id:"biosolidos", nom:"Biosólidos", frecKey:"biosolidos"},
+  {id:"cloro", nom:"Cloro residual", frecKey:null},
+  {id:"otro", nom:"Otro", frecKey:null}
+];
+const EQUIPOS_OPER=["Limpieza de rejas","Bombas","Tablero eléctrico","Sopladores","Clorador","Lagunas","Desmalezado","Alambrados","Iluminación","Generador"];
+const INC_TIPOS=["Rebalse","Olores","Lluvias","Corte de energía","Rotura","Reclamo de vecinos","Otro"];
+const INV_CAT=["Bombas","Válvulas","Motores","Herramientas","Insumos","Cloro","Reactivos"];
+
+/* ---------- Cálculo de agenda / semáforo ---------- */
+function ultimoAnalisis(tipoId){
+  const l=S.analisis.filter(a=>a.tipo===tipoId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return l[0]?l[0].fecha:null;
+}
+function proximo(tipoId){
+  const frecMap={minima:S.config.frec.minima,completa:S.config.frec.completa,biosolidos:S.config.frec.biosolidos};
+  const dias=frecMap[tipoId]; if(!dias) return null;
+  const ult=ultimoAnalisis(tipoId);
+  if(!ult) return {sin:true};
+  const prox=isoDate(addDias(ult,dias));
+  const rest=diasEntre(isoDate(hoy()),prox);
+  return {ult, prox, rest, estado:estadoPorDias(rest)};
+}
+function proximaInspeccion(){
+  const insp=S.inspecciones.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+  if(!insp) return {sin:true};
+  const prox=isoDate(addDias(insp.fecha,S.config.frec.inspeccion));
+  const rest=diasEntre(isoDate(hoy()),prox);
+  return {ult:insp.fecha, prox, rest, estado:estadoPorDias(rest)};
+}
+function estadoPorDias(rest){
+  if(rest<0) return "rojo";
+  if(rest<=S.config.umbral.naranja) return "naranja";
+  if(rest<=S.config.umbral.amarillo) return "amarillo";
+  return "verde";
+}
+const ORD={verde:0,amarillo:1,naranja:2,rojo:3};
+function estadoGeneral(){
+  const items=[proximo("minima"),proximo("completa")];
+  if(S.config.biosolidos) items.push(proximo("biosolidos"));
+  items.push(proximaInspeccion());
+  let peor="verde";
+  items.forEach(i=>{if(i&&!i.sin&&ORD[i.estado]>ORD[peor])peor=i.estado;});
+  return peor;
+}
+const ETIQ={verde:"Todo en regla",amarillo:"Atención: análisis próximos a vencer",naranja:"Urgente: análisis muy próximos",rojo:"Vencido: hay análisis fuera de término"};
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+const VIEWS={};
+let vistaActual="dashboard";
+function ir(v){
+  vistaActual=v;
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  document.querySelectorAll(".mobnav button[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  toggleSide(false);
+  document.getElementById("content").innerHTML=VIEWS[v]?VIEWS[v]():"";
+  if(POST[v])POST[v]();
+  window.scrollTo(0,0);
+}
+function toggleSide(abrir){
+  const s=document.getElementById("side"),b=document.getElementById("sideBackdrop");
+  const mostrar=abrir===undefined?!s.classList.contains("show"):abrir;
+  s.classList.toggle("show",mostrar);
+  b.classList.toggle("show",mostrar);
+}
+const POST={};
+document.getElementById("nav").addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(b)ir(b.dataset.v);});
+
+/* ---------- Reloj ---------- */
+function tick(){
+  const d=hoy();
+  document.getElementById("reloj").innerHTML="🕑 <b>"+d.toLocaleDateString("es-AR",{weekday:'long',day:'numeric',month:'long',year:'numeric'})+"</b> · "+d.toLocaleTimeString("es-AR",{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(tick,1000);tick();
+
+/* ============================================================
+   MÓDULO 1 · DASHBOARD
+   ============================================================ */
+VIEWS.dashboard=()=>{
+  const g=estadoGeneral();
+  const c=S.config;
+  const min=proximo("minima"),com=proximo("completa"),bio=proximo("biosolidos"),ins=proximaInspeccion();
+  const diasSin=diasEntre(c.diaCeroIncidentes,isoDate(hoy()));
+  const ultimos=S.analisis.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,5);
+  const stockBajo=S.inventario.filter(i=>Number(i.cantidad)<=Number(i.stockMin));
+
+  // avisos
+  const avisos=[];
+  [["Caracterización mínima",min],["Caracterización completa",com]].forEach(([n,p])=>{
+    if(p&&!p.sin&&(p.estado==="rojo"||p.estado==="naranja")) avisos.push({n,p});
+  });
+  if(c.biosolidos&&bio&&!bio.sin&&(bio.estado==="rojo"||bio.estado==="naranja")) avisos.push({n:"Biosólidos",p:bio});
+  if(ins&&!ins.sin&&(ins.estado==="rojo"||ins.estado==="naranja")) avisos.push({n:"Inspección ENRESS",p:ins});
+  const nivelAviso=avisos.some(a=>a.p.estado==="rojo")?"rojo":avisos.some(a=>a.p.estado==="naranja")?"naranja":"amarillo";
+
+  let html=`<h2 class="view-title">Panel de control</h2>
+  <div class="view-sub">${c.localidad} · Planta Depuradora de Líquidos Cloacales</div>`;
+
+  html+=`<div class="semaforo s-${g}" style="margin-bottom:16px">
+    <div class="luz"></div>
+    <div><h2>${ETIQ[g]}</h2><p>Estado general de la planta según cronograma de análisis e inspecciones (Res. ENRESS 169/2026).</p></div>
+  </div>`;
+
+  html+=`<div class="card no-print" style="margin-bottom:16px">
+    <h3 style="margin-bottom:10px">⚡ Carga diaria</h3>
+    <div class="grid qa-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">
+      <button class="btn" style="justify-content:center;padding:14px" onclick="ir('bitacora')">📖 Anotar en bitácora</button>
+      <button class="btn" style="justify-content:center;padding:14px" onclick="formOper()">✅ Registrar jornada</button>
+      <button class="btn sec" style="justify-content:center;padding:14px" onclick="formInc()">⚠️ Cargar incidente</button>
+      <button class="btn sec" style="justify-content:center;padding:14px" onclick="formLag()">🌊 Registro lagunas</button>
+    </div>
+  </div>`;
+
+  if(avisos.length){
+    html+=`<div class="aviso ${nivelAviso}"><span class="big">${nivelAviso==="rojo"?"⛔":"⏰"}</span><div>
+      <b>Hay tareas que requieren tu atención:</b><ul>`;
+    avisos.forEach(a=>{
+      const t=a.p.rest<0?`vencido hace ${Math.abs(a.p.rest)} día(s)`:`vence en ${a.p.rest} día(s) (${fmtF(a.p.prox)})`;
+      html+=`<li>${a.n}: ${t}.</li>`;
+    });
+    html+=`</ul></div></div>`;
+  }
+
+  html+=`<div class="grid g-4" style="margin-bottom:14px">
+    ${kpiProx("Próx. análisis mínimo","🧪",min)}
+    ${kpiProx("Próx. análisis completo","🔬",com)}
+    ${c.biosolidos?kpiProx("Próx. biosólidos","🧱",bio):kpiSimple("Biosólidos","🧱","No aplica","La planta no genera barros")}
+    ${kpiProx("Próx. inspección ENRESS","🏛️",ins)}
+  </div>`;
+
+  html+=`<div class="grid g-4" style="margin-bottom:18px">
+    ${kpiSimple("Conexiones cloacales","🔗",num(c.conexiones),"domiciliarias")}
+    ${kpiSimple("Población servida","👥",num(c.poblacion),"habitantes activos")}
+    ${kpiSimple("Días sin incidentes","🛡️",diasSin>=0?diasSin:0,"desde "+fmtF(c.diaCeroIncidentes))}
+    ${kpiSimple("Análisis registrados","📋",S.analisis.length,"en total")}
+  </div>`;
+
+  html+=`<div class="grid g-2">
+    <div class="card"><div class="head-row" style="margin-bottom:10px"><h3>Últimos análisis realizados</h3>
+      <button class="btn sec no-print" onclick="ir('analisis')">Ver todos</button></div>`;
+  if(ultimos.length){
+    html+=`<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Lab.</th><th>Cumple</th></tr></thead><tbody>`;
+    ultimos.forEach(a=>{
+      const nom=(TIPOS.find(t=>t.id===a.tipo)||{}).nom||a.tipo;
+      html+=`<tr><td>${fmtF(a.fecha)}</td><td>${nom}</td><td>${a.laboratorio||"—"}</td><td>${a.cumple==="Sí"?'<span class="chip c-verde">✔ Sí</span>':a.cumple==="No"?'<span class="chip c-rojo">✘ No</span>':'<span class="chip c-gris">—</span>'}</td></tr>`;
+    });
+    html+=`</tbody></table>`;
+  }else html+=`<div class="vacio"><span class="em">🧪</span>Todavía no cargaste análisis.<br><button class="btn" style="margin-top:10px" onclick="ir('analisis')">Cargar el primero</button></div>`;
+  html+=`</div>`;
+
+  html+=`<div class="card"><div class="head-row" style="margin-bottom:10px"><h3>Alertas de stock</h3>
+      <button class="btn sec no-print" onclick="ir('inventario')">Inventario</button></div>`;
+  if(stockBajo.length){
+    html+=`<table><thead><tr><th>Ítem</th><th>Cantidad</th><th>Mínimo</th></tr></thead><tbody>`;
+    stockBajo.forEach(i=>html+=`<tr><td>${i.item}</td><td><span class="chip c-rojo">${i.cantidad} ${i.uni||""}</span></td><td>${i.stockMin} ${i.uni||""}</td></tr>`);
+    html+=`</tbody></table>`;
+  }else html+=`<div class="vacio" style="padding:22px"><span class="em">📦</span>Sin alertas de stock mínimo.</div>`;
+  html+=`</div></div>`;
+
+  html+=`<div style="margin-top:18px" class="no-print"><button class="btn" onclick="ir('informe')">🖨️ Generar informe mensual para ENRESS</button></div>`;
+  return html;
+};
+function kpiProx(lbl,ic,p){
+  if(!p||p.sin) return `<div class="card kpi"><div class="lbl">${ic} ${lbl}</div><div class="val" style="font-size:16px;color:var(--gris)">Sin registro</div><div class="foot">Cargá un análisis para calcular</div></div>`;
+  const cls="c-"+p.estado;
+  const txt=p.rest<0?`Vencido hace ${Math.abs(p.rest)} d`:`Faltan ${p.rest} días`;
+  return `<div class="card kpi"><div class="lbl">${ic} ${lbl}</div><div class="val" style="font-size:19px">${fmtF(p.prox)}</div><div class="foot"><span class="chip ${cls}">${txt}</span></div></div>`;
+}
+function kpiSimple(lbl,ic,val,foot){
+  return `<div class="card kpi"><div class="lbl">${ic} ${lbl}</div><div class="val">${val}</div><div class="foot">${foot||""}</div></div>`;
+}
+
+/* ============================================================
+   MÓDULO 2 · AGENDA DE ANÁLISIS
+   ============================================================ */
+VIEWS.agenda=()=>{
+  const c=S.config;
+  let html=`<h2 class="view-title">Agenda automática de análisis</h2>
+  <div class="view-sub">Se calcula sola a partir de la fecha del último análisis de cada tipo. Frecuencias según Tabla 1 del reglamento (población de ${num(c.poblacion)} hab.).</div>`;
+
+  const filas=[
+    {nom:"Caracterización mínima",id:"minima",frec:c.frec.minima,per:"Bimestral"},
+    {nom:"Caracterización completa",id:"completa",frec:c.frec.completa,per:"Cuatrimestral"},
+  ];
+  if(c.biosolidos) filas.push({nom:"Biosólidos",id:"biosolidos",frec:c.frec.biosolidos,per:"Semestral"});
+
+  html+=`<div class="tabla-wrap"><table><thead><tr>
+    <th>Tipo de análisis</th><th>Frecuencia</th><th>Último realizado</th><th>Próximo</th><th>Faltan</th><th>Estado</th></tr></thead><tbody>`;
+  filas.forEach(f=>{
+    const p=proximo(f.id);
+    if(p&&!p.sin){
+      const t=p.rest<0?`vencido ${Math.abs(p.rest)} d`:p.rest+" días";
+      html+=`<tr><td><b>${f.nom}</b></td><td>${f.per} (${f.frec} d)</td><td>${fmtF(p.ult)}</td><td>${fmtF(p.prox)}</td><td>${t}</td><td>${chipEstado(p.estado)}</td></tr>`;
+    }else{
+      html+=`<tr><td><b>${f.nom}</b></td><td>${f.per} (${f.frec} d)</td><td colspan="3" style="color:var(--gris)">Sin análisis registrados</td><td><span class="chip c-gris">—</span></td></tr>`;
+    }
+  });
+  // inspección
+  const ins=proximaInspeccion();
+  if(!ins.sin){const t=ins.rest<0?`vencido ${Math.abs(ins.rest)} d`:ins.rest+" días";
+    html+=`<tr><td><b>Inspección ENRESS</b></td><td>Semestral (${c.frec.inspeccion} d)</td><td>${fmtF(ins.ult)}</td><td>${fmtF(ins.prox)}</td><td>${t}</td><td>${chipEstado(ins.estado)}</td></tr>`;
+  }else html+=`<tr><td><b>Inspección ENRESS</b></td><td>Semestral</td><td colspan="3" style="color:var(--gris)">Sin inspecciones registradas</td><td><span class="chip c-gris">—</span></td></tr>`;
+  html+=`</tbody></table></div>`;
+
+  html+=`<div class="card" style="margin-top:16px"><h3 style="margin-bottom:8px">Referencia de colores</h3>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+    <span>${chipEstado("verde")} más de ${c.umbral.amarillo} días</span>
+    <span>${chipEstado("amarillo")} menos de ${c.umbral.amarillo} días</span>
+    <span>${chipEstado("naranja")} menos de ${c.umbral.naranja} días</span>
+    <span>${chipEstado("rojo")} vencido</span></div>
+    <p class="hint" style="margin-top:10px">Los umbrales y las frecuencias se ajustan en <a href="#" onclick="ir('config');return false">Configuración</a>.</p></div>`;
+  return html;
+};
+function chipEstado(e){const m={verde:"✔ En regla",amarillo:"● Próximo",naranja:"● Urgente",rojo:"✘ Vencido"};return `<span class="chip c-${e}">${m[e]}</span>`;}
+
+/* ============================================================
+   MÓDULO 3 · REGISTRO DE ANÁLISIS  (+ Módulo 4 parámetros)
+   ============================================================ */
+POST.analisis=()=>renderAnalisis();
+VIEWS.analisis=()=>`
+  <div class="head-row"><div><h2 class="view-title">Registro de análisis</h2>
+    <div class="view-sub">Base de datos de análisis con sus parámetros de laboratorio.</div></div>
+    <button class="btn" onclick="formAnalisis()">＋ Nuevo análisis</button></div>
+  <div class="filtros">
+    <select id="fAnio" onchange="renderAnalisis()"><option value="">Todos los años</option></select>
+    <select id="fTipo" onchange="renderAnalisis()"><option value="">Todos los tipos</option>${TIPOS.map(t=>`<option value="${t.id}">${t.nom}</option>`).join("")}</select>
+    <select id="fLab" onchange="renderAnalisis()"><option value="">Todos los laboratorios</option></select>
+  </div>
+  <div id="tblAnalisis"></div>`;
+function renderAnalisis(){
+  const anios=[...new Set(S.analisis.map(a=>a.fecha.slice(0,4)))].sort().reverse();
+  const labs=[...new Set(S.analisis.map(a=>a.laboratorio).filter(Boolean))].sort();
+  const selA=document.getElementById("fAnio"),selL=document.getElementById("fLab");
+  if(selA&&selA.options.length<=1)anios.forEach(a=>selA.add(new Option(a,a)));
+  if(selL&&selL.options.length<=1)labs.forEach(l=>selL.add(new Option(l,l)));
+  const fa=selA?selA.value:"",ft=document.getElementById("fTipo")?.value||"",fl=selL?selL.value:"";
+  let list=S.analisis.filter(a=>(!fa||a.fecha.startsWith(fa))&&(!ft||a.tipo===ft)&&(!fl||a.laboratorio===fl))
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  let html;
+  if(!list.length){html=`<div class="tabla-wrap"><div class="vacio"><span class="em">🧪</span>No hay análisis${S.analisis.length?" con esos filtros":" cargados todavía"}.</div></div>`;}
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Laboratorio</th><th>Profesional</th><th>N° informe</th><th>Cumple</th><th>Parám.</th><th></th></tr></thead><tbody>`;
+    list.forEach(a=>{
+      const nom=(TIPOS.find(t=>t.id===a.tipo)||{}).nom||a.tipo;
+      const cumple=a.cumple==="Sí"?'<span class="chip c-verde">✔ Sí</span>':a.cumple==="No"?'<span class="chip c-rojo">✘ No</span>':'<span class="chip c-gris">—</span>';
+      html+=`<tr><td>${fmtF(a.fecha)}</td><td>${nom}</td><td>${a.laboratorio||"—"}</td><td>${a.profesional||"—"}</td><td>${a.nroInforme||"—"}</td><td>${cumple}</td>
+        <td>${a.parametros&&a.parametros.length?`<span class="chip c-gris">${a.parametros.length}</span>`:"—"}</td>
+        <td class="t-acc"><button class="mini" onclick="formAnalisis('${a.id}')">Editar</button><button class="mini del" onclick="borrar('analisis','${a.id}')">✕</button></td></tr>`;
+      if(a.observaciones)html+=`<tr><td colspan="8" style="color:var(--gris);font-size:12px;padding-top:0">📝 ${a.observaciones}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblAnalisis").innerHTML=html;
+}
+let tmpParams=[];
+function formAnalisis(id){
+  const a=id?S.analisis.find(x=>x.id===id):null;
+  tmpParams=a&&a.parametros?JSON.parse(JSON.stringify(a.parametros)):[];
+  abrirModal(id?"Editar análisis":"Nuevo análisis",`
+    <div class="f-row">
+      <label class="fld"><span>Fecha *</span><input type="date" id="i_fecha" value="${a?a.fecha:isoDate(hoy())}"></label>
+      <label class="fld"><span>Tipo de análisis *</span><select id="i_tipo" onchange="sugerirParams()">${TIPOS.map(t=>`<option value="${t.id}" ${a&&a.tipo===t.id?"selected":""}>${t.nom}</option>`).join("")}</select></label>
+    </div>
+    <div class="f-row">
+      <label class="fld"><span>Laboratorio</span><input id="i_lab" value="${a?a.laboratorio||"":""}"></label>
+      <label class="fld"><span>Profesional</span><input id="i_prof" value="${a?a.profesional||"":""}"></label>
+    </div>
+    <div class="f-row">
+      <label class="fld"><span>N° de informe</span><input id="i_nro" value="${a?a.nroInforme||"":""}"></label>
+      <label class="fld"><span>¿Cumple?</span><select id="i_cumple"><option ${a&&a.cumple==="Sí"?"selected":""}>Sí</option><option ${a&&a.cumple==="No"?"selected":""}>No</option><option ${!a||!a.cumple?"selected":""}>—</option></select></label>
+    </div>
+    <label class="fld f-1"><span>Observaciones</span><textarea id="i_obs">${a?a.observaciones||"":""}</textarea></label>
+    <div style="border-top:1px solid var(--linea);margin:14px 0 10px;padding-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:13px;color:var(--agua-800)">Parámetros de laboratorio (Módulo 4)</b>
+        <button class="mini" onclick="sugerirParams(true)">Cargar plantilla del tipo</button>
+      </div>
+      <div id="paramBox"></div>
+      <button class="mini" style="margin-top:8px" onclick="addParam()">＋ Agregar parámetro</button>
+    </div>
+  `,()=>{
+    const fecha=document.getElementById("i_fecha").value;
+    if(!fecha){alert("La fecha es obligatoria");return false;}
+    leerParams();
+    const obj={id:id||uid(),fecha,tipo:document.getElementById("i_tipo").value,
+      laboratorio:document.getElementById("i_lab").value.trim(),
+      profesional:document.getElementById("i_prof").value.trim(),
+      nroInforme:document.getElementById("i_nro").value.trim(),
+      cumple:document.getElementById("i_cumple").value,
+      observaciones:document.getElementById("i_obs").value.trim(),
+      parametros:tmpParams};
+    if(id)S.analisis=S.analisis.map(x=>x.id===id?obj:x);else S.analisis.push(obj);
+    guardar();renderAnalisis();return true;
+  });
+  renderParams();
+}
+function sugerirParams(force){
+  const tipo=document.getElementById("i_tipo").value;
+  if(tmpParams.length&&!force)return renderParams();
+  let clases=[];
+  if(tipo==="minima")clases=["minima"];
+  else if(tipo==="completa")clases=["minima","completa"];
+  else if(tipo==="cloro")clases=["cloro"];
+  if(clases.length){
+    tmpParams=S.limites.filter(l=>clases.includes(l.clase)).map(l=>({param:l.param,resultado:"",limite:(l.min!=null?l.min+"–":"")+ (l.max!=null?l.max:"") +(l.uni?" "+l.uni:""),uni:l.uni,min:l.min,max:l.max}));
+  }
+  renderParams();
+}
+function addParam(){leerParams();tmpParams.push({param:"",resultado:"",limite:"",uni:"",min:null,max:null});renderParams();}
+function leerParams(){
+  document.querySelectorAll("#paramBox .prow").forEach((r,i)=>{
+    if(!tmpParams[i])return;
+    tmpParams[i].param=r.querySelector(".p_nom").value;
+    tmpParams[i].resultado=r.querySelector(".p_res").value;
+  });
+}
+function estadoParam(p){
+  if(p.resultado===""||p.resultado==null)return "gris";
+  const v=parseFloat(String(p.resultado).replace(",","."));
+  if(isNaN(v))return "gris";
+  if(p.min!=null&&v<p.min)return "rojo";
+  if(p.max!=null&&v>p.max)return "rojo";
+  return "verde";
+}
+function renderParams(){
+  const box=document.getElementById("paramBox");if(!box)return;
+  if(!tmpParams.length){box.innerHTML=`<div style="color:var(--gris);font-size:12.5px">Sin parámetros. Elegí un tipo y usá "Cargar plantilla", o agregalos a mano.</div>`;return;}
+  box.innerHTML=`<table style="font-size:12.5px"><thead><tr><th>Parámetro</th><th>Resultado</th><th>Límite</th><th>Estado</th><th></th></tr></thead><tbody>${
+    tmpParams.map((p,i)=>{const e=estadoParam(p);
+      return `<tr class="prow">
+        <td><input class="p_nom" value="${p.param||""}" style="width:100%;padding:5px 7px;border:1px solid var(--linea);border-radius:6px" oninput="tmpParams[${i}].param=this.value"></td>
+        <td><input class="p_res" value="${p.resultado||""}" style="width:78px;padding:5px 7px;border:1px solid var(--linea);border-radius:6px" oninput="tmpParams[${i}].resultado=this.value;refreshEstado(${i},this)"></td>
+        <td style="color:var(--gris)">${p.limite||(p.max!=null?"≤ "+p.max:"—")} ${p.uni&&!/[a-z]/i.test(p.limite||"")?p.uni:""}</td>
+        <td class="pest">${e==="verde"?'🟢':e==="rojo"?'🔴':'⚪'}</td>
+        <td><button class="mini del" onclick="tmpParams.splice(${i},1);renderParams()">✕</button></td></tr>`;}).join("")
+  }</tbody></table>`;
+}
+function refreshEstado(i,inp){
+  const e=estadoParam(tmpParams[i]);
+  const cell=inp.closest("tr").querySelector(".pest");
+  cell.textContent=e==="verde"?"🟢":e==="rojo"?"🔴":"⚪";
+}
+
+/* ============================================================
+   MÓDULO 5 · OPERACIÓN DIARIA
+   ============================================================ */
+POST.operacion=()=>renderOper();
+VIEWS.operacion=()=>`
+  <div class="head-row"><div><h2 class="view-title">Operación diaria</h2>
+    <div class="view-sub">Control diario de rejas, bombas, tableros, clorador, lagunas y demás equipos.</div></div>
+    <button class="btn" onclick="formOper()">＋ Registrar jornada</button></div>
+  <div id="tblOper"></div>`;
+function renderOper(){
+  if(!document.getElementById("tblOper")){if(vistaActual==='dashboard')ir('dashboard');return;}
+  const list=S.operacion.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">✅</span>Sin registros de operación diaria.</div></div>`;
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Estado de controles</th><th></th></tr></thead><tbody>`;
+    list.forEach(o=>{
+      const ok=Object.values(o.items).filter(x=>x.estado==="ok").length;
+      const no=Object.values(o.items).filter(x=>x.estado==="no").length;
+      html+=`<tr><td>${fmtF(o.fecha)}</td><td>${o.responsable||"—"}</td>
+        <td><span class="chip c-verde">✔ ${ok} ok</span> ${no?`<span class="chip c-rojo">✘ ${no} con novedad</span>`:""}</td>
+        <td class="t-acc"><button class="mini" onclick="formOper('${o.id}')">Ver / editar</button><button class="mini del" onclick="borrar('operacion','${o.id}')">✕</button></td></tr>`;
+      const novs=Object.entries(o.items).filter(([k,v])=>v.obs).map(([k,v])=>`${k}: ${v.obs}`);
+      if(novs.length)html+=`<tr><td colspan="4" style="color:var(--gris);font-size:12px;padding-top:0">📝 ${novs.join(" · ")}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblOper").innerHTML=html;
+}
+function formOper(id){
+  const o=id?S.operacion.find(x=>x.id===id):null;
+  const items=o?o.items:{};
+  abrirModal(id?"Editar jornada":"Registrar jornada",`
+    <div class="f-row">
+      <label class="fld"><span>Fecha *</span><input type="date" id="i_fecha" value="${o?o.fecha:isoDate(hoy())}"></label>
+      <label class="fld"><span>Responsable</span><input id="i_resp" value="${o?o.responsable||"":""}"></label>
+    </div>
+    <div class="chk-grid" id="chkGrid">${EQUIPOS_OPER.map(nm=>{
+      const it=items[nm]||{estado:"ok",obs:""};
+      return `<div class="chk-item" data-nm="${nm}">
+        <div class="nm">${nm}
+          <span class="toggle"><button type="button" class="${it.estado==="ok"?"on-ok":""}" onclick="tgl(this,'ok')">OK</button><button type="button" class="${it.estado==="no"?"on-no":""}" onclick="tgl(this,'no')">Novedad</button></span></div>
+        <input type="text" class="obs" placeholder="Observación…" value="${it.obs||""}"></div>`;
+    }).join("")}</div>
+  `,()=>{
+    const fecha=document.getElementById("i_fecha").value;if(!fecha){alert("La fecha es obligatoria");return false;}
+    const items={};
+    document.querySelectorAll("#chkGrid .chk-item").forEach(el=>{
+      const nm=el.dataset.nm;
+      const estado=el.querySelector(".on-no")&&el.querySelector(".on-no").classList.contains("on-no")?
+        (el.querySelectorAll(".toggle button")[1].classList.contains("on-no")?"no":"ok"):"ok";
+      const btns=el.querySelectorAll(".toggle button");
+      items[nm]={estado:btns[1].classList.contains("on-no")?"no":"ok",obs:el.querySelector(".obs").value.trim()};
+    });
+    const obj={id:id||uid(),fecha,responsable:document.getElementById("i_resp").value.trim(),items};
+    if(id)S.operacion=S.operacion.map(x=>x.id===id?obj:x);else S.operacion.push(obj);
+    guardar();renderOper();return true;
+  });
+}
+function tgl(btn,val){
+  const wrap=btn.parentElement;wrap.querySelectorAll("button").forEach(b=>b.classList.remove("on-ok","on-no"));
+  btn.classList.add(val==="ok"?"on-ok":"on-no");
+}
+
+/* ============================================================
+   MÓDULO 6 · MANTENIMIENTO (fichas de equipos)
+   ============================================================ */
+POST.mantenimiento=()=>renderMant();
+VIEWS.mantenimiento=()=>`
+  <div class="head-row"><div><h2 class="view-title">Mantenimiento de equipos</h2>
+    <div class="view-sub">Ficha de cada bomba, tablero, soplador y equipo con su próximo service.</div></div>
+    <button class="btn" onclick="formEquipo()">＋ Nuevo equipo</button></div>
+  <div id="tblMant"></div>`;
+function renderMant(){
+  const list=S.equipos.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">🔧</span>Sin equipos cargados.</div></div>`;
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Equipo</th><th>Marca / Modelo</th><th>Instalación</th><th>Último service</th><th>Próximo service</th><th>Horas</th><th>Estado</th><th></th></tr></thead><tbody>`;
+    list.forEach(e=>{
+      let alerta="";
+      if(e.proxService){const r=diasEntre(isoDate(hoy()),e.proxService);alerta=r<0?`<span class="chip c-rojo">vencido</span>`:r<=15?`<span class="chip c-naranja">en ${r} d</span>`:r<=45?`<span class="chip c-amarillo">en ${r} d</span>`:"";}
+      html+=`<tr><td><b>${e.nombre}</b></td><td>${[e.marca,e.modelo].filter(Boolean).join(" / ")||"—"}</td>
+        <td>${fmtF(e.fInstal)}</td><td>${fmtF(e.ultService)}</td><td>${fmtF(e.proxService)} ${alerta}</td>
+        <td>${e.horas||"—"}</td><td>${chipEquipo(e.estado)}</td>
+        <td class="t-acc"><button class="mini" onclick="formEquipo('${e.id}')">Editar</button><button class="mini del" onclick="borrar('equipos','${e.id}')">✕</button></td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblMant").innerHTML=html;
+}
+function chipEquipo(e){const m={"Operativo":"c-verde","En observación":"c-amarillo","En reparación":"c-naranja","Fuera de servicio":"c-rojo"};return `<span class="chip ${m[e]||"c-gris"}">${e||"—"}</span>`;}
+function formEquipo(id){
+  const e=id?S.equipos.find(x=>x.id===id):null;
+  abrirModal(id?"Editar equipo":"Nuevo equipo",`
+    <label class="fld f-1" style="margin-bottom:12px"><span>Nombre del equipo * (ej. Bomba Nº1)</span><input id="i_nom" value="${e?e.nombre||"":""}"></label>
+    <div class="f-row"><label class="fld"><span>Marca</span><input id="i_marca" value="${e?e.marca||"":""}"></label>
+      <label class="fld"><span>Modelo</span><input id="i_mod" value="${e?e.modelo||"":""}"></label></div>
+    <div class="f-row"><label class="fld"><span>Fecha de instalación</span><input type="date" id="i_inst" value="${e?e.fInstal||"":""}"></label>
+      <label class="fld"><span>Horas trabajadas</span><input id="i_horas" value="${e?e.horas||"":""}"></label></div>
+    <div class="f-row"><label class="fld"><span>Último service</span><input type="date" id="i_ult" value="${e?e.ultService||"":""}"></label>
+      <label class="fld"><span>Próximo service</span><input type="date" id="i_prox" value="${e?e.proxService||"":""}"></label></div>
+    <label class="fld f-1"><span>Estado</span><select id="i_est">${["Operativo","En observación","En reparación","Fuera de servicio"].map(x=>`<option ${e&&e.estado===x?"selected":""}>${x}</option>`).join("")}</select></label>
+  `,()=>{
+    const nombre=document.getElementById("i_nom").value.trim();if(!nombre){alert("El nombre es obligatorio");return false;}
+    const obj={id:id||uid(),nombre,marca:document.getElementById("i_marca").value.trim(),modelo:document.getElementById("i_mod").value.trim(),
+      fInstal:document.getElementById("i_inst").value,horas:document.getElementById("i_horas").value.trim(),
+      ultService:document.getElementById("i_ult").value,proxService:document.getElementById("i_prox").value,
+      estado:document.getElementById("i_est").value};
+    if(id)S.equipos=S.equipos.map(x=>x.id===id?obj:x);else S.equipos.push(obj);
+    guardar();renderMant();return true;
+  });
+}
+
+/* ============================================================
+   MÓDULO 7 · INCIDENTES
+   ============================================================ */
+POST.incidentes=()=>renderInc();
+VIEWS.incidentes=()=>`
+  <div class="head-row"><div><h2 class="view-title">Incidentes</h2>
+    <div class="view-sub">Rebalses, olores, lluvias, cortes de energía, roturas y reclamos de vecinos (art. c.6 del reglamento).</div></div>
+    <button class="btn" onclick="formInc()">＋ Registrar incidente</button></div>
+  <div id="tblInc"></div>`;
+function renderInc(){
+  if(!document.getElementById("tblInc")){if(vistaActual==='dashboard')ir('dashboard');return;}
+  const list=S.incidentes.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">⚠️</span>Sin incidentes registrados. ¡Mejor así!</div></div>`;
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Responsable</th><th>Descripción</th><th>Solución aplicada</th><th>Estado</th><th></th></tr></thead><tbody>`;
+    list.forEach(i=>{
+      html+=`<tr><td>${fmtF(i.fecha)}</td><td>${i.tipo}</td><td>${i.responsable||"—"}</td><td>${i.descripcion||"—"}</td><td>${i.solucion||"—"}</td>
+        <td><span class="chip ${i.estado==="Resuelto"?"c-verde":i.estado==="En proceso"?"c-amarillo":"c-rojo"}">${i.estado||"Abierto"}</span></td>
+        <td class="t-acc"><button class="mini" onclick="formInc('${i.id}')">Editar</button><button class="mini del" onclick="borrar('incidentes','${i.id}')">✕</button></td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblInc").innerHTML=html;
+}
+function formInc(id){
+  const i=id?S.incidentes.find(x=>x.id===id):null;
+  abrirModal(id?"Editar incidente":"Registrar incidente",`
+    <div class="f-row"><label class="fld"><span>Fecha *</span><input type="date" id="i_fecha" value="${i?i.fecha:isoDate(hoy())}"></label>
+      <label class="fld"><span>Tipo</span><select id="i_tipo">${INC_TIPOS.map(t=>`<option ${i&&i.tipo===t?"selected":""}>${t}</option>`).join("")}</select></label></div>
+    <div class="f-row"><label class="fld"><span>Responsable</span><input id="i_resp" value="${i?i.responsable||"":""}"></label>
+      <label class="fld"><span>Estado</span><select id="i_est">${["Abierto","En proceso","Resuelto"].map(x=>`<option ${i&&i.estado===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
+    <label class="fld f-1" style="margin-bottom:12px"><span>Descripción</span><textarea id="i_desc">${i?i.descripcion||"":""}</textarea></label>
+    <label class="fld f-1"><span>Solución aplicada</span><textarea id="i_sol">${i?i.solucion||"":""}</textarea></label>
+  `,()=>{
+    const fecha=document.getElementById("i_fecha").value;if(!fecha){alert("La fecha es obligatoria");return false;}
+    const obj={id:id||uid(),fecha,tipo:document.getElementById("i_tipo").value,responsable:document.getElementById("i_resp").value.trim(),
+      estado:document.getElementById("i_est").value,descripcion:document.getElementById("i_desc").value.trim(),solucion:document.getElementById("i_sol").value.trim()};
+    if(id)S.incidentes=S.incidentes.map(x=>x.id===id?obj:x);else S.incidentes.push(obj);
+    guardar();renderInc();return true;
+  });
+}
+
+/* ============================================================
+   MÓDULO 8 · CAMIONES ATMOSFÉRICOS
+   ============================================================ */
+POST.camiones=()=>renderCam();
+VIEWS.camiones=()=>`
+  <div class="head-row"><div><h2 class="view-title">Camiones atmosféricos</h2>
+    <div class="view-sub">Registro de descargas exigido por el reglamento (art. c.4).</div></div>
+    <button class="btn" onclick="formCam()">＋ Registrar descarga</button></div>
+  <div id="tblCam"></div>`;
+function renderCam(){
+  const list=S.camiones.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const totM3=list.reduce((s,c)=>s+(Number(c.m3)||0),0);
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">🚚</span>Sin descargas registradas.</div></div>`;
+  else{
+    html=`<div class="card kpi" style="margin-bottom:12px;max-width:280px"><div class="lbl">🚚 Total descargado</div><div class="val">${num(totM3)} <small>m³</small></div></div>
+    <div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Empresa</th><th>Procedencia</th><th>Viajes</th><th>m³</th><th>Responsable</th><th></th></tr></thead><tbody>`;
+    list.forEach(c=>html+=`<tr><td>${fmtF(c.fecha)}</td><td>${c.empresa||"—"}</td><td>${c.procedencia||"—"}</td><td>${c.viajes||"—"}</td><td>${c.m3||"—"}</td><td>${c.responsable||"—"}</td>
+      <td class="t-acc"><button class="mini" onclick="formCam('${c.id}')">Editar</button><button class="mini del" onclick="borrar('camiones','${c.id}')">✕</button></td></tr>`);
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblCam").innerHTML=html;
+}
+function formCam(id){
+  const c=id?S.camiones.find(x=>x.id===id):null;
+  abrirModal(id?"Editar descarga":"Registrar descarga",`
+    <div class="f-row"><label class="fld"><span>Fecha *</span><input type="date" id="i_fecha" value="${c?c.fecha:isoDate(hoy())}"></label>
+      <label class="fld"><span>Empresa</span><input id="i_emp" value="${c?c.empresa||"":""}"></label></div>
+    <div class="f-row"><label class="fld"><span>Procedencia</span><input id="i_proc" value="${c?c.procedencia||"":""}"></label>
+      <label class="fld"><span>Responsable</span><input id="i_resp" value="${c?c.responsable||"":""}"></label></div>
+    <div class="f-row"><label class="fld"><span>Cantidad de viajes</span><input type="number" id="i_via" value="${c?c.viajes||"":""}"></label>
+      <label class="fld"><span>m³ descargados</span><input type="number" step="0.1" id="i_m3" value="${c?c.m3||"":""}"></label></div>
+  `,()=>{
+    const fecha=document.getElementById("i_fecha").value;if(!fecha){alert("La fecha es obligatoria");return false;}
+    const obj={id:id||uid(),fecha,empresa:document.getElementById("i_emp").value.trim(),procedencia:document.getElementById("i_proc").value.trim(),
+      responsable:document.getElementById("i_resp").value.trim(),viajes:document.getElementById("i_via").value,m3:document.getElementById("i_m3").value};
+    if(id)S.camiones=S.camiones.map(x=>x.id===id?obj:x);else S.camiones.push(obj);
+    guardar();renderCam();return true;
+  });
+}
+
+/* ============================================================
+   MÓDULO 9 · INSPECCIONES ENRESS
+   ============================================================ */
+POST.inspecciones=()=>renderInsp();
+VIEWS.inspecciones=()=>`
+  <div class="head-row"><div><h2 class="view-title">Inspecciones ENRESS</h2>
+    <div class="view-sub">Inspecciones sanitarias del Ente Regulador con su estado de cumplimiento.</div></div>
+    <button class="btn" onclick="formInsp()">＋ Registrar inspección</button></div>
+  <div id="tblInsp"></div>`;
+function renderInsp(){
+  const list=S.inspecciones.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">🏛️</span>Sin inspecciones registradas.</div></div>`;
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Fecha</th><th>Inspector</th><th>Observaciones</th><th>Recomendaciones</th><th>Plazo</th><th>Cumplimiento</th><th></th></tr></thead><tbody>`;
+    list.forEach(i=>html+=`<tr><td>${fmtF(i.fecha)}</td><td>${i.inspector||"—"}</td><td>${i.observaciones||"—"}</td><td>${i.recomendaciones||"—"}</td><td>${fmtF(i.plazo)}</td>
+      <td><span class="chip ${i.cumplimiento==="Cumplido"?"c-verde":i.cumplimiento==="En proceso"?"c-amarillo":"c-rojo"}">${i.cumplimiento||"Pendiente"}</span></td>
+      <td class="t-acc"><button class="mini" onclick="formInsp('${i.id}')">Editar</button><button class="mini del" onclick="borrar('inspecciones','${i.id}')">✕</button></td></tr>`+
+      (i.fotos?`<tr><td colspan="7" style="color:var(--gris);font-size:12px;padding-top:0">📷 ${i.fotos}</td></tr>`:""));
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblInsp").innerHTML=html;
+}
+function formInsp(id){
+  const i=id?S.inspecciones.find(x=>x.id===id):null;
+  abrirModal(id?"Editar inspección":"Registrar inspección",`
+    <div class="f-row"><label class="fld"><span>Fecha *</span><input type="date" id="i_fecha" value="${i?i.fecha:isoDate(hoy())}"></label>
+      <label class="fld"><span>Inspector</span><input id="i_insp" value="${i?i.inspector||"":""}"></label></div>
+    <label class="fld f-1" style="margin-bottom:12px"><span>Observaciones</span><textarea id="i_obs">${i?i.observaciones||"":""}</textarea></label>
+    <label class="fld f-1" style="margin-bottom:12px"><span>Recomendaciones</span><textarea id="i_rec">${i?i.recomendaciones||"":""}</textarea></label>
+    <div class="f-row"><label class="fld"><span>Plazo de cumplimiento</span><input type="date" id="i_plazo" value="${i?i.plazo||"":""}"></label>
+      <label class="fld"><span>Estado de cumplimiento</span><select id="i_cum">${["Pendiente","En proceso","Cumplido"].map(x=>`<option ${i&&i.cumplimiento===x?"selected":""}>${x}</option>`).join("")}</select></label></div>
+    <label class="fld f-1"><span>Fotografías (referencia / nombre de archivo)</span><input id="i_fotos" value="${i?i.fotos||"":""}"></label>
+  `,()=>{
+    const fecha=document.getElementById("i_fecha").value;if(!fecha){alert("La fecha es obligatoria");return false;}
+    const obj={id:id||uid(),fecha,inspector:document.getElementById("i_insp").value.trim(),observaciones:document.getElementById("i_obs").value.trim(),
+      recomendaciones:document.getElementById("i_rec").value.trim(),plazo:document.getElementById("i_plazo").value,
+      cumplimiento:document.getElementById("i_cum").value,fotos:document.getElementById("i_fotos").value.trim()};
+    if(id)S.inspecciones=S.inspecciones.map(x=>x.id===id?obj:x);else S.inspecciones.push(obj);
+    guardar();renderInsp();return true;
+  });
+}
+
+/* ============================================================
+   MÓDULO · LAGUNAS (Anexo I del reglamento)
+   ============================================================ */
+const LAG_FILAS=["Color del agua","Temperatura (°C)","Olor","Presencia de espumas","Presencia de material flotante","Desarrollo de juncos","Estado de terraplenes","Nivel del agua"];
+POST.lagunas=()=>renderLag();
+VIEWS.lagunas=()=>`
+  <div class="head-row"><div><h2 class="view-title">Registro semanal de lagunas</h2>
+    <div class="view-sub">Anexo I del reglamento: inspección visual semanal obligatoria para plantas con lagunas de estabilización.</div></div>
+    <button class="btn" onclick="formLag()">＋ Nuevo registro mensual</button></div>
+  <div id="tblLag"></div>`;
+function renderLag(){
+  if(!document.getElementById("tblLag")){if(vistaActual==='dashboard')ir('dashboard');return;}
+  const list=S.lagunas.slice().sort((a,b)=>(b.anio+b.mes).localeCompare(a.anio+a.mes));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">🌊</span>Sin registros de lagunas.</div></div>`;
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Mes / Año</th><th>Temp. media amb.</th><th>Clima</th><th>Caminos de acceso</th><th></th></tr></thead><tbody>`;
+    list.forEach(l=>html+=`<tr><td><b>${l.mes}/${l.anio}</b></td><td>${l.tempAmb||"—"} °C</td><td>${l.clima||"—"}</td><td>${l.caminos||"—"}</td>
+      <td class="t-acc"><button class="mini" onclick="formLag('${l.id}')">Ver / editar</button><button class="mini del" onclick="borrar('lagunas','${l.id}')">✕</button></td></tr>`);
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblLag").innerHTML=html;
+}
+const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+function formLag(id){
+  const l=id?S.lagunas.find(x=>x.id===id):null;
+  const grid=l&&l.grid?l.grid:{};
+  let tabla=`<table style="font-size:12px"><thead><tr><th>Parámetro</th>${[1,2,3,4,5].map(n=>`<th>Sem ${n}</th>`).join("")}</tr></thead><tbody>`;
+  LAG_FILAS.forEach(f=>{tabla+=`<tr><td style="white-space:normal;min-width:140px">${f}</td>${[1,2,3,4,5].map(s=>`<td><input data-f="${f}" data-s="${s}" value="${(grid[f]&&grid[f][s])||""}" style="width:56px;padding:4px;border:1px solid var(--linea);border-radius:5px"></td>`).join("")}</tr>`;});
+  tabla+=`</tbody></table>`;
+  abrirModal(id?"Editar registro de lagunas":"Registro semanal de lagunas (Anexo I)",`
+    <div class="f-row"><label class="fld"><span>Mes *</span><select id="i_mes">${MESES.map(m=>`<option ${l&&l.mes===m?"selected":""}>${m}</option>`).join("")}</select></label>
+      <label class="fld"><span>Año *</span><input id="i_anio" value="${l?l.anio:hoy().getFullYear()}"></label></div>
+    <div class="f-row"><label class="fld"><span>Temp. media ambiental (°C)</span><input id="i_temp" value="${l?l.tempAmb||"":""}"></label>
+      <label class="fld"><span>Condiciones climáticas</span><input id="i_clima" placeholder="Soleado / Ventoso / Lluvioso…" value="${l?l.clima||"":""}"></label></label></div>
+    <label class="fld f-1" style="margin-bottom:12px"><span>Condiciones de los caminos de acceso</span><input id="i_cam" value="${l?l.caminos||"":""}"></label>
+    <div style="border-top:1px solid var(--linea);padding-top:10px"><b style="font-size:12.5px;color:var(--agua-800)">Inspección visual semanal</b>
+    <div style="overflow-x:auto;margin-top:6px">${tabla}</div></div>
+    <label class="fld f-1" style="margin-top:12px"><span>Otras observaciones</span><textarea id="i_obs">${l?l.obs||"":""}</textarea></label>
+  `,()=>{
+    const mes=document.getElementById("i_mes").value,anio=document.getElementById("i_anio").value;
+    const g={};document.querySelectorAll("#modalBody input[data-f]").forEach(inp=>{const f=inp.dataset.f,s=inp.dataset.s;if(inp.value){g[f]=g[f]||{};g[f][s]=inp.value;}});
+    const obj={id:id||uid(),mes,anio,tempAmb:document.getElementById("i_temp").value.trim(),clima:document.getElementById("i_clima").value.trim(),
+      caminos:document.getElementById("i_cam").value.trim(),obs:document.getElementById("i_obs").value.trim(),grid:g};
+    if(id)S.lagunas=S.lagunas.map(x=>x.id===id?obj:x);else S.lagunas.push(obj);
+    guardar();renderLag();return true;
+  });
+}
+
+/* ============================================================
+   MÓDULO 13 · INVENTARIO
+   ============================================================ */
+POST.inventario=()=>renderInv();
+VIEWS.inventario=()=>`
+  <div class="head-row"><div><h2 class="view-title">Inventario</h2>
+    <div class="view-sub">Bombas, válvulas, motores, herramientas, insumos, cloro y reactivos con alerta de stock mínimo.</div></div>
+    <button class="btn" onclick="formInv()">＋ Nuevo ítem</button></div>
+  <div class="filtros"><select id="fCat" onchange="renderInv()"><option value="">Todas las categorías</option>${INV_CAT.map(c=>`<option>${c}</option>`).join("")}</select></div>
+  <div id="tblInv"></div>`;
+function renderInv(){
+  const fc=document.getElementById("fCat")?.value||"";
+  const list=S.inventario.filter(i=>!fc||i.categoria===fc).sort((a,b)=>(a.categoria+a.item).localeCompare(b.categoria+b.item));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">📦</span>Sin ítems en inventario.</div></div>`;
+  else{
+    html=`<div class="tabla-wrap"><table><thead><tr><th>Categoría</th><th>Ítem</th><th>Cantidad</th><th>Stock mínimo</th><th>Estado</th><th></th></tr></thead><tbody>`;
+    list.forEach(i=>{const bajo=Number(i.cantidad)<=Number(i.stockMin);
+      html+=`<tr><td>${i.categoria}</td><td><b>${i.item}</b></td><td>${i.cantidad} ${i.uni||""}</td><td>${i.stockMin} ${i.uni||""}</td>
+        <td>${bajo?'<span class="chip c-rojo">⚠ Stock bajo</span>':'<span class="chip c-verde">✔ Ok</span>'}</td>
+        <td class="t-acc"><button class="mini" onclick="formInv('${i.id}')">Editar</button><button class="mini del" onclick="borrar('inventario','${i.id}')">✕</button></td></tr>`;});
+    html+=`</tbody></table></div>`;
+  }
+  document.getElementById("tblInv").innerHTML=html;
+}
+function formInv(id){
+  const i=id?S.inventario.find(x=>x.id===id):null;
+  abrirModal(id?"Editar ítem":"Nuevo ítem de inventario",`
+    <div class="f-row"><label class="fld"><span>Categoría</span><select id="i_cat">${INV_CAT.map(c=>`<option ${i&&i.categoria===c?"selected":""}>${c}</option>`).join("")}</select></label>
+      <label class="fld"><span>Unidad</span><input id="i_uni" placeholder="u / kg / lt…" value="${i?i.uni||"":""}"></label></div>
+    <label class="fld f-1" style="margin-bottom:12px"><span>Ítem *</span><input id="i_item" value="${i?i.item||"":""}"></label>
+    <div class="f-row"><label class="fld"><span>Cantidad</span><input type="number" step="0.1" id="i_cant" value="${i?i.cantidad||"":""}"></label>
+      <label class="fld"><span>Stock mínimo</span><input type="number" step="0.1" id="i_min" value="${i?i.stockMin||"":""}"></label></div>
+  `,()=>{
+    const item=document.getElementById("i_item").value.trim();if(!item){alert("El ítem es obligatorio");return false;}
+    const obj={id:id||uid(),categoria:document.getElementById("i_cat").value,uni:document.getElementById("i_uni").value.trim(),
+      item,cantidad:document.getElementById("i_cant").value||0,stockMin:document.getElementById("i_min").value||0};
+    if(id)S.inventario=S.inventario.map(x=>x.id===id?obj:x);else S.inventario.push(obj);
+    guardar();renderInv();return true;
+  });
+}
+
+/* ============================================================
+   MÓDULO 14 · BITÁCORA DIARIA
+   ============================================================ */
+POST.bitacora=()=>renderBita();
+VIEWS.bitacora=()=>`
+  <h2 class="view-title">Bitácora diaria</h2>
+  <div class="view-sub">Registro libre de cada operador. Queda archivado por fecha.</div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="f-row"><label class="fld"><span>Fecha</span><input type="date" id="b_fecha" value="${isoDate(hoy())}"></label>
+      <label class="fld"><span>Operador</span><input id="b_op" placeholder="Tu nombre"></label></div>
+    <label class="fld f-1"><span>Anotación</span><textarea id="b_txt" placeholder="✔ Se limpió la reja&#10;✔ Se verificó bomba Nº2&#10;✔ Nivel de laguna normal&#10;✔ Sin olores&#10;✔ Sin reclamos"></textarea></label>
+    <div style="margin-top:10px"><button class="btn" onclick="addBita()">＋ Guardar anotación</button></div>
+  </div>
+  <div id="listaBita"></div>`;
+function addBita(){
+  const fecha=document.getElementById("b_fecha").value,op=document.getElementById("b_op").value.trim(),txt=document.getElementById("b_txt").value.trim();
+  if(!txt){alert("Escribí la anotación");return;}
+  S.bitacora.push({id:uid(),fecha,operador:op,texto:txt,ts:Date.now()});guardar();
+  document.getElementById("b_txt").value="";renderBita();
+}
+function renderBita(){
+  const list=S.bitacora.slice().sort((a,b)=>b.ts-a.ts);
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">📖</span>La bitácora está vacía.</div></div>`;
+  else{
+    html=`<div class="card">`;
+    list.forEach(b=>html+=`<div class="bita-line"><div class="meta">${fmtF(b.fecha)} · ${b.operador||"—"} <button class="mini del" style="float:right" onclick="borrar('bitacora','${b.id}')">✕</button></div>
+      <div style="white-space:pre-wrap;margin-top:3px">${b.texto.replace(/</g,"&lt;")}</div></div>`);
+    html+=`</div>`;
+  }
+  document.getElementById("listaBita").innerHTML=html;
+}
+
+/* ============================================================
+   MÓDULO 11 · ESTADÍSTICAS
+   ============================================================ */
+let charts=[];
+POST.estadisticas=()=>renderStats();
+VIEWS.estadisticas=()=>`
+  <h2 class="view-title">Estadísticas</h2>
+  <div class="view-sub">Gráficos automáticos a partir de los datos cargados.</div>
+  <div class="grid g-2">
+    <div class="card"><h3 style="margin-bottom:8px">Análisis por año</h3><canvas id="c1" height="150"></canvas></div>
+    <div class="card"><h3 style="margin-bottom:8px">Cumplimiento</h3><canvas id="c2" height="150"></canvas></div>
+    <div class="card"><h3 style="margin-bottom:8px">Incidentes por mes</h3><canvas id="c3" height="150"></canvas></div>
+    <div class="card"><h3 style="margin-bottom:8px">Estado de equipos</h3><canvas id="c4" height="150"></canvas></div>
+    <div class="card"><h3 style="margin-bottom:8px">Evolución DBO / DQO</h3><canvas id="c5" height="150"></canvas></div>
+    <div class="card"><h3 style="margin-bottom:8px">Evolución pH / Coliformes fecales</h3><canvas id="c6" height="150"></canvas></div>
+  </div>`;
+function renderStats(){
+  charts.forEach(c=>c.destroy());charts=[];
+  const col={a:"#1a8a9c",b:"#c9960b",c:"#c0392b",d:"#1f9d55",e:"#7f56d9"};
+  // 1 análisis por año
+  const porAnio={};S.analisis.forEach(a=>{const y=a.fecha.slice(0,4);porAnio[y]=(porAnio[y]||0)+1;});
+  mkChart("c1","bar",Object.keys(porAnio),[{label:"Análisis",data:Object.values(porAnio),backgroundColor:col.a}]);
+  // 2 cumplimiento
+  const si=S.analisis.filter(a=>a.cumple==="Sí").length,no=S.analisis.filter(a=>a.cumple==="No").length;
+  mkChart("c2","doughnut",["Cumple","No cumple","Sin dato"],[{data:[si,no,S.analisis.length-si-no],backgroundColor:[col.d,col.c,"#cfd8da"]}]);
+  // 3 incidentes por mes
+  const im={};S.incidentes.forEach(i=>{const m=i.fecha.slice(0,7);im[m]=(im[m]||0)+1;});
+  const mk=Object.keys(im).sort();mkChart("c3","bar",mk,[{label:"Incidentes",data:mk.map(k=>im[k]),backgroundColor:col.c}]);
+  // 4 equipos
+  const est={};S.equipos.forEach(e=>{est[e.estado]=(est[e.estado]||0)+1;});
+  mkChart("c4","doughnut",Object.keys(est),[{data:Object.values(est),backgroundColor:[col.d,col.b,"#d9691a",col.c]}]);
+  // 5 DBO/DQO
+  const serie=(nm)=>S.analisis.filter(a=>a.parametros&&a.parametros.some(p=>p.param===nm))
+    .map(a=>({x:a.fecha,y:parseFloat(String(a.parametros.find(p=>p.param===nm).resultado).replace(",","."))}))
+    .filter(p=>!isNaN(p.y)).sort((a,b)=>a.x.localeCompare(b.x));
+  mkLine("c5",[{label:"DBO",data:serie("DBO"),borderColor:col.a},{label:"DQO",data:serie("DQO"),borderColor:col.b}]);
+  mkLine("c6",[{label:"pH",data:serie("pH"),borderColor:col.d},{label:"Colif. fecales",data:serie("Coliformes Fecales"),borderColor:col.c,yAxisID:"y2"}],true);
+}
+function mkChart(id,type,labels,datasets){const el=document.getElementById(id);if(!el)return;charts.push(new Chart(el,{type,data:{labels,datasets},options:{responsive:true,plugins:{legend:{display:type!=="bar"}},scales:type==="bar"?{y:{beginAtZero:true,ticks:{precision:0}}}:{}}}));}
+function mkLine(id,datasets,dual){const el=document.getElementById(id);if(!el)return;
+  const scales={x:{type:"category"},y:{beginAtZero:true}};if(dual)scales.y2={position:"right",beginAtZero:true,grid:{drawOnChartArea:false}};
+  charts.push(new Chart(el,{type:"line",data:{datasets:datasets.map(d=>({...d,tension:.3,spanGaps:true}))},options:{parsing:{xAxisKey:"x",yAxisKey:"y"},responsive:true,scales}}));}
+
+/* ============================================================
+   MÓDULO 10 · DOCUMENTACIÓN
+   ============================================================ */
+VIEWS.documentacion=()=>{
+  const c=S.config.carpeta;
+  return `<h2 class="view-title">Documentación</h2>
+  <div class="view-sub">Acceso a la carpeta donde guardás análisis, fotografías, informes, notas, resoluciones y actas.</div>
+  <div class="card">
+    ${c?`<p>Carpeta configurada:</p><p style="margin:8px 0 14px"><a href="${c}" target="_blank" style="font-weight:600">${c}</a></p>
+      <button class="btn" onclick="window.open('${c}','_blank')">📁 Abrir carpeta</button>`
+      :`<div class="vacio"><span class="em">📁</span>Todavía no configuraste la carpeta de documentación.<br>
+      <button class="btn" style="margin-top:10px" onclick="ir('config')">Configurar ahora</button></div>`}
+    <div style="margin-top:18px;border-top:1px solid var(--linea);padding-top:14px">
+      <p class="hint">Sugerido: una carpeta de Google Drive con subcarpetas por tipo — Análisis · Fotografías · Informes · Notas · Resoluciones · Actas. Pegá el enlace en Configuración y desde acá se abre con un clic.</p>
+    </div>
+  </div>`;
+};
+
+/* ============================================================
+   MÓDULO 12 · INFORME ENRESS (imprimible)
+   ============================================================ */
+VIEWS.informe=()=>{
+  const c=S.config;const d=hoy();
+  const min=proximo("minima"),com=proximo("completa"),bio=proximo("biosolidos"),ins=proximaInspeccion();
+  const rango=new Date();rango.setMonth(rango.getMonth()-1);
+  const desde=isoDate(rango);
+  const anAn=S.analisis.filter(a=>a.fecha>=desde).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const inc=S.incidentes.filter(i=>i.fecha>=desde);
+  const cam=S.camiones.filter(x=>x.fecha>=desde);
+  const mant=S.equipos.filter(e=>e.ultService&&e.ultService>=desde);
+  let h=`<div class="head-row no-print"><h2 class="view-title">Informe para ENRESS</h2>
+    <button class="btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
+    <div class="card">`;
+  h+=`<div style="text-align:center;border-bottom:2px solid var(--agua-700);padding-bottom:12px;margin-bottom:16px">
+      <h2 style="color:var(--agua-800)">${c.prestador}</h2>
+      <p style="color:var(--gris);margin-top:4px">Informe de control de calidad — Servicio de desagües cloacales</p>
+      <p style="color:var(--gris);font-size:12px">Reglamento de Control de Calidad para Servicios Públicos de Desagües Cloacales (ENRESS) · Emitido: ${d.toLocaleDateString("es-AR")}</p>
+    </div>`;
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">1. Datos del servicio</h3>
+    <table style="margin-bottom:18px"><tbody>
+      <tr><td><b>Localidad</b></td><td>${c.localidad}</td><td><b>Población servida</b></td><td>${num(c.poblacion)} hab.</td></tr>
+      <tr><td><b>Conexiones cloacales</b></td><td>${num(c.conexiones)}</td><td><b>Tipo de tratamiento</b></td><td>${c.tratamiento}</td></tr>
+    </tbody></table>`;
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">2. Cronograma de análisis</h3>
+    <table style="margin-bottom:18px"><thead><tr><th>Tipo</th><th>Frecuencia</th><th>Último</th><th>Próximo</th><th>Estado</th></tr></thead><tbody>
+      ${filaCron("Caracterización mínima","Bimestral",min)}
+      ${filaCron("Caracterización completa","Cuatrimestral",com)}
+      ${c.biosolidos?filaCron("Biosólidos","Semestral",bio):""}
+      ${filaCron("Inspección ENRESS","Semestral",ins)}
+    </tbody></table>`;
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">3. Análisis del último mes</h3>`;
+  if(anAn.length){h+=`<table style="margin-bottom:18px"><thead><tr><th>Fecha</th><th>Tipo</th><th>Laboratorio</th><th>N° informe</th><th>Cumple</th></tr></thead><tbody>`;
+    anAn.forEach(a=>{const nom=(TIPOS.find(t=>t.id===a.tipo)||{}).nom||a.tipo;h+=`<tr><td>${fmtF(a.fecha)}</td><td>${nom}</td><td>${a.laboratorio||"—"}</td><td>${a.nroInforme||"—"}</td><td>${a.cumple||"—"}</td></tr>`;});
+    h+=`</tbody></table>`;}else h+=`<p style="color:var(--gris);margin-bottom:18px">Sin análisis en el período.</p>`;
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">4. Incidentes</h3>`;
+  if(inc.length){h+=`<table style="margin-bottom:18px"><thead><tr><th>Fecha</th><th>Tipo</th><th>Solución</th><th>Estado</th></tr></thead><tbody>`;
+    inc.forEach(i=>h+=`<tr><td>${fmtF(i.fecha)}</td><td>${i.tipo}</td><td>${i.solucion||"—"}</td><td>${i.estado||"—"}</td></tr>`);h+=`</tbody></table>`;}
+  else h+=`<p style="color:var(--gris);margin-bottom:18px">Sin incidentes en el período.</p>`;
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">5. Camiones atmosféricos</h3>`;
+  if(cam.length){h+=`<table style="margin-bottom:18px"><thead><tr><th>Fecha</th><th>Empresa</th><th>Viajes</th><th>m³</th></tr></thead><tbody>`;
+    cam.forEach(x=>h+=`<tr><td>${fmtF(x.fecha)}</td><td>${x.empresa||"—"}</td><td>${x.viajes||"—"}</td><td>${x.m3||"—"}</td></tr>`);h+=`</tbody></table>`;}
+  else h+=`<p style="color:var(--gris);margin-bottom:18px">Sin descargas en el período.</p>`;
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">6. Mantenimiento realizado</h3>`;
+  if(mant.length){h+=`<table style="margin-bottom:18px"><thead><tr><th>Equipo</th><th>Último service</th><th>Estado</th></tr></thead><tbody>`;
+    mant.forEach(e=>h+=`<tr><td>${e.nombre}</td><td>${fmtF(e.ultService)}</td><td>${e.estado||"—"}</td></tr>`);h+=`</tbody></table>`;}
+  else h+=`<p style="color:var(--gris);margin-bottom:18px">Sin services registrados en el período.</p>`;
+  h+=`<div style="margin-top:30px;display:flex;justify-content:space-around;text-align:center;color:var(--gris);font-size:12px">
+      <div>_______________________<br>Responsable de planta</div>
+      <div>_______________________<br>Presidente Comunal</div></div>`;
+  h+=`</div>`;
+  return h;
+};
+function filaCron(nom,frec,p){
+  if(!p||p.sin)return `<tr><td>${nom}</td><td>${frec}</td><td colspan="2" style="color:#888">Sin registro</td><td>—</td></tr>`;
+  const est={verde:"En regla",amarillo:"Próximo",naranja:"Urgente",rojo:"Vencido"}[p.estado];
+  return `<tr><td>${nom}</td><td>${frec}</td><td>${fmtF(p.ult)}</td><td>${fmtF(p.prox)}</td><td>${est}</td></tr>`;
+}
+
+/* ============================================================
+   CONFIGURACIÓN
+   ============================================================ */
+VIEWS.config=()=>{
+  const c=S.config;
+  return `<h2 class="view-title">Configuración</h2>
+  <div class="view-sub">Datos de la planta, frecuencias del reglamento, umbrales de alerta y límites de vuelco.</div>
+
+  <div class="card cfg-sect">
+    <h3>Datos del servicio</h3>
+    <div class="f-row"><label class="fld"><span>Localidad / Prestador</span><input id="cf_loc" value="${c.localidad}"></label>
+      <label class="fld"><span>Tipo de tratamiento</span><input id="cf_trat" value="${c.tratamiento}"></label></div>
+    <div class="f-row"><label class="fld"><span>Población servida (hab.)</span><input type="number" id="cf_pob" value="${c.poblacion}"></label>
+      <label class="fld"><span>Conexiones cloacales</span><input type="number" id="cf_con" value="${c.conexiones}"></label></div>
+    <div class="f-row">
+      <label class="fld"><span>¿Tiene cloración?</span><select id="cf_clo"><option value="1" ${c.cloracion?"selected":""}>Sí</option><option value="0" ${!c.cloracion?"selected":""}>No</option></select></label>
+      <label class="fld"><span>¿Genera biosólidos / barros?</span><select id="cf_bio"><option value="1" ${c.biosolidos?"selected":""}>Sí</option><option value="0" ${!c.biosolidos?"selected":""}>No</option></select></label></div>
+    <label class="fld f-1"><span>Carpeta de documentación (enlace Drive / carpeta)</span><input id="cf_carp" value="${c.carpeta||""}" placeholder="https://drive.google.com/…"></label>
+  </div>
+
+  <div class="card cfg-sect">
+    <h3>Frecuencias de análisis (días)</h3>
+    <p class="hint" style="margin-bottom:10px">Precargadas según la Tabla 1 del reglamento para ${num(c.poblacion)} hab. (rango 2.000–10.000). Editá si cambia la población.</p>
+    <div class="f-row"><label class="fld"><span>Caracterización mínima (bimestral)</span><input type="number" id="cf_fmin" value="${c.frec.minima}"></label>
+      <label class="fld"><span>Caracterización completa (cuatrimestral)</span><input type="number" id="cf_fcom" value="${c.frec.completa}"></label></div>
+    <div class="f-row"><label class="fld"><span>Biosólidos (semestral)</span><input type="number" id="cf_fbio" value="${c.frec.biosolidos}"></label>
+      <label class="fld"><span>Inspección ENRESS (semestral)</span><input type="number" id="cf_fins" value="${c.frec.inspeccion}"></label></div>
+  </div>
+
+  <div class="card cfg-sect">
+    <h3>Umbrales de alerta (días)</h3>
+    <div class="f-row"><label class="fld"><span>Amarillo cuando falten menos de</span><input type="number" id="cf_uama" value="${c.umbral.amarillo}"></label>
+      <label class="fld"><span>Naranja cuando falten menos de</span><input type="number" id="cf_unar" value="${c.umbral.naranja}"></label></div>
+  </div>
+
+  <div class="card cfg-sect">
+    <h3>Límites de vuelco (Módulo 4)</h3>
+    <p class="hint" style="margin-bottom:10px">⚠️ Valores <b>editables</b>. Verificá contra el Anexo B de la Ley 11220. Para lagunas de estabilización, el reglamento flexibiliza Sólidos Suspendidos Totales a 120 mg/l.</p>
+    <div id="cfgLimites"></div>
+    <button class="mini" style="margin-top:8px" onclick="addLimite()">＋ Agregar parámetro</button>
+  </div>
+
+  <div class="card cfg-sect">
+    <h3>Sincronización con Google Drive</h3>
+    <p class="hint" style="margin-bottom:10px">Pegá la URL del backend de Apps Script (termina en <code>/exec</code>). Con esto, todo el equipo carga y ve los mismos datos desde cualquier PC o celular. Si lo dejás vacío, la app funciona igual pero guarda solo en este equipo.</p>
+    <label class="fld f-1" style="margin-bottom:10px"><span>URL del backend (Apps Script /exec)</span><input id="cf_sync" value="${c.syncUrl||""}" placeholder="https://script.google.com/macros/s/.../exec"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sec" onclick="probarSync()">🔌 Probar conexión</button>
+      <button class="btn sec" onclick="doSync('manual')">🔄 Sincronizar ahora</button>
+      <span id="cfgSyncMsg" style="align-self:center;font-size:12.5px;color:var(--gris)"></span>
+    </div>
+  </div>
+
+  <div class="toolbar"><button class="btn" onclick="guardarConfig()">💾 Guardar configuración</button>
+    <button class="btn ghost" onclick="if(confirm('¿Borrar TODOS los datos y volver a empezar? Esta acción no se puede deshacer.')){localStorage.removeItem(KEY);S=estadoInicial();guardar();ir('dashboard');}">🗑️ Reiniciar todo</button></div>`;
+};
+POST.config=()=>renderLimitesCfg();
+function renderLimitesCfg(){
+  const box=document.getElementById("cfgLimites");if(!box)return;
+  box.innerHTML=`<table style="font-size:12.5px"><thead><tr><th>Parámetro</th><th>Mín.</th><th>Máx.</th><th>Unidad</th><th>Clase</th><th></th></tr></thead><tbody>${
+    S.limites.map((l,i)=>`<tr>
+      <td><input value="${l.param}" oninput="S.limites[${i}].param=this.value" style="width:100%;padding:5px;border:1px solid var(--linea);border-radius:6px"></td>
+      <td><input value="${l.min??""}" oninput="S.limites[${i}].min=this.value===''?null:parseFloat(this.value)" style="width:62px;padding:5px;border:1px solid var(--linea);border-radius:6px"></td>
+      <td><input value="${l.max??""}" oninput="S.limites[${i}].max=this.value===''?null:parseFloat(this.value)" style="width:62px;padding:5px;border:1px solid var(--linea);border-radius:6px"></td>
+      <td><input value="${l.uni||""}" oninput="S.limites[${i}].uni=this.value" style="width:70px;padding:5px;border:1px solid var(--linea);border-radius:6px"></td>
+      <td><select onchange="S.limites[${i}].clase=this.value" style="padding:5px;border:1px solid var(--linea);border-radius:6px">${["minima","completa","cloro","otro"].map(cl=>`<option ${l.clase===cl?"selected":""}>${cl}</option>`).join("")}</select></td>
+      <td><button class="mini del" onclick="S.limites.splice(${i},1);guardar();renderLimitesCfg()">✕</button></td></tr>`).join("")
+  }</tbody></table>`;
+}
+function addLimite(){S.limites.push({param:"",uni:"",min:null,max:null,clase:"otro"});renderLimitesCfg();}
+function guardarConfig(){
+  const c=S.config;
+  c.localidad=document.getElementById("cf_loc").value.trim();c.prestador=c.localidad;
+  c.tratamiento=document.getElementById("cf_trat").value.trim();
+  c.poblacion=+document.getElementById("cf_pob").value||0;c.conexiones=+document.getElementById("cf_con").value||0;
+  c.cloracion=document.getElementById("cf_clo").value==="1";c.biosolidos=document.getElementById("cf_bio").value==="1";
+  c.carpeta=document.getElementById("cf_carp").value.trim();
+  c.frec.minima=+document.getElementById("cf_fmin").value;c.frec.completa=+document.getElementById("cf_fcom").value;
+  c.frec.biosolidos=+document.getElementById("cf_fbio").value;c.frec.inspeccion=+document.getElementById("cf_fins").value;
+  c.umbral.amarillo=+document.getElementById("cf_uama").value;c.umbral.naranja=+document.getElementById("cf_unar").value;
+  const sInp=document.getElementById("cf_sync");if(sInp)c.syncUrl=sInp.value.trim();
+  c._upd=Date.now();S._limitesUpd=Date.now();
+  document.getElementById("brandLoc").textContent=c.localidad;
+  guardar();alert("Configuración guardada ✔");ir("dashboard");
+}
+
+/* ============================================================
+   Helpers globales (modal, borrar, backup)
+   ============================================================ */
+let modalSaveFn=null;
+function abrirModal(titulo,html,onSave){
+  document.getElementById("modalTitle").textContent=titulo;
+  document.getElementById("modalBody").innerHTML=html;
+  modalSaveFn=onSave;
+  document.getElementById("modalBg").classList.add("open");
+}
+function cerrarModal(){document.getElementById("modalBg").classList.remove("open");modalSaveFn=null;}
+document.getElementById("modalSave").addEventListener("click",()=>{if(modalSaveFn){const r=modalSaveFn();if(r!==false)cerrarModal();}});
+document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")cerrarModal();});
+function borrar(col,id){if(!confirm("¿Eliminar este registro?"))return;S._deleted=S._deleted||[];S._deleted.push({col,id,ts:Date.now()});S[col]=S[col].filter(x=>x.id!==id);guardar();
+  const map={analisis:renderAnalisis,operacion:renderOper,equipos:renderMant,incidentes:renderInc,camiones:renderCam,inspecciones:renderInsp,lagunas:renderLag,inventario:renderInv,bitacora:renderBita};
+  if(map[col])map[col]();}
+function exportarJSON(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="planta-cloacal-alcorta-"+isoDate(hoy())+".json";a.click();
+}
+function importarJSON(ev){
+  const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=e=>{try{const d=JSON.parse(e.target.result);if(confirm("Esto reemplaza los datos actuales por los del archivo. ¿Continuar?")){S=Object.assign(estadoInicial(),d);guardar();ir("dashboard");}}catch(err){alert("Archivo inválido");}};
+  r.readAsText(f);ev.target.value="";
+}
+document.getElementById("linkBackup").addEventListener("click",e=>{e.preventDefault();exportarJSON();});
+
+/* ============================================================
+   SINCRONIZACIÓN CON GOOGLE DRIVE (Apps Script)
+   ============================================================ */
+let syncTimer=null, syncing=false;
+function setSyncStatus(tipo,txt){
+  const pill=document.getElementById("syncPill");
+  if(pill){const c={ok:"c-verde",sync:"c-amarillo",err:"c-rojo",off:"c-gris"}[tipo]||"c-gris";
+    const ic={ok:"☁︎",sync:"↻",err:"⚠",off:"○"}[tipo]||"○";
+    pill.className="chip "+c;pill.innerHTML=ic+" "+txt;}
+  const m=document.getElementById("cfgSyncMsg");if(m)m.textContent=txt;
+}
+function scheduleSync(){
+  if(!S.config||!S.config.syncUrl)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>doSync("auto"),1200); // agrupa cambios seguidos
+}
+function modalAbierto(){return document.getElementById("modalBg").classList.contains("open");}
+async function doSync(origen){
+  const url=S.config&&S.config.syncUrl;
+  if(!url){setSyncStatus("off","Sin sincronización");return;}
+  if(syncing)return;
+  syncing=true;setSyncStatus("sync","Sincronizando…");
+  try{
+    const payload={action:"sync",datos:S,deleted:S._deleted||[]};
+    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+    const j=await r.json();
+    if(j&&j.ok&&j.datos){
+      aplicarRemoto(j.datos,origen==="manual"||origen==="startup");
+      setSyncStatus("ok","Al día · "+new Date().toLocaleTimeString("es-AR",{hour:'2-digit',minute:'2-digit'}));
+    }else setSyncStatus("err",(j&&j.error)||"Error del servidor");
+  }catch(e){setSyncStatus("err","Sin conexión (guardado local)");}
+  finally{syncing=false;}
+}
+function aplicarRemoto(datos,forzarRender){
+  const url=S.config.syncUrl;
+  const antes=localStorage.getItem(KEY);
+  S=Object.assign(estadoInicial(),datos);
+  if(!S.config.syncUrl)S.config.syncUrl=url;
+  S._deleted=datos._deleted||[];
+  const ahora=JSON.stringify(S);
+  localStorage.setItem(KEY,ahora); // guardar sin re-disparar sync
+  document.getElementById("brandLoc").textContent=S.config.localidad;
+  const cambio=antes!==ahora;
+  const editando=/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement||{}).tagName||"");
+  if((forzarRender||cambio)&&!modalAbierto()&&!editando)ir(vistaActual); // refrescar solo si cambió y no estás escribiendo
+}
+async function probarSync(){
+  const url=document.getElementById("cf_sync").value.trim();
+  if(!url){setSyncStatus("err","Pegá primero la URL");return;}
+  setSyncStatus("sync","Probando…");
+  try{
+    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"ping"})});
+    const j=await r.json();
+    if(j&&j.ok){setSyncStatus("ok","Conexión OK ✔ — guardá la configuración");}
+    else setSyncStatus("err","Respuesta inesperada");
+  }catch(e){setSyncStatus("err","No se pudo conectar. Revisá la URL y el acceso (Cualquier usuario).");}
+}
+// Refresco periódico: trae lo que cargaron otros
+setInterval(()=>{if(S.config&&S.config.syncUrl&&!syncing&&!modalAbierto())doSync("periodico");},45000);
+
+/* Arranque */
+ir("dashboard");
+if(S.config&&S.config.syncUrl){doSync("startup");}else{setSyncStatus("off","Solo este equipo");}
+</script>
+</body>
+</html>
