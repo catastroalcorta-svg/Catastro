@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v42</title>
+<title>Catastro Municipal — Alcorta v43</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1600,7 +1600,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v42</span>
+      <span class="hdr-logo">ALCORTA v43</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -4436,7 +4436,11 @@ function abrirLibreDeudaUrbano(recId){
 
   const deudaTasa=parseFloat(r.deudaTasa||0);
   const deudaCloaca=parseFloat(r.deudaCloaca||0);
-  const tieneDeuda=deudaTasa>0||deudaCloaca>0;
+  const deudaMejoras=parseFloat(r.deudaMejoras||0);
+  const deudaVivienda=parseFloat(r.deudaVivienda||0);
+  const deudaVarias=parseFloat(r.deudaTasasVarias||0);
+  const deudaTotal=deudaTasa+deudaCloaca+deudaMejoras+deudaVivienda+deudaVarias;
+  const tieneDeuda=deudaTotal>0;
 
   const hoy=new Date();
   const fechaISO=hoy.toISOString().slice(0,10);
@@ -4466,8 +4470,11 @@ function abrirLibreDeudaUrbano(recId){
         </p>
         <div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);border-radius:10px;padding:14px;margin-bottom:20px">
           ${deudaTasa>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(220,38,38,.15)"><span style="color:var(--text2)">Tasa TGIU</span><span style="color:#dc2626;font-weight:700">$${deudaTasa.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>`:''}
-          ${deudaCloaca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0"><span style="color:var(--text2)">Cloacas</span><span style="color:#dc2626;font-weight:700">$${deudaCloaca.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>`:''}
-          <div style="display:flex;justify-content:space-between;font-size:14px;padding:8px 0 0;margin-top:4px;border-top:1px solid rgba(220,38,38,.2)"><span style="font-weight:600">Total</span><span style="color:#dc2626;font-weight:800">$${(deudaTasa+deudaCloaca).toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>
+          ${deudaCloaca>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(220,38,38,.15)"><span style="color:var(--text2)">Cloacas</span><span style="color:#dc2626;font-weight:700">$${deudaCloaca.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>`:''}
+          ${deudaMejoras>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(220,38,38,.15)"><span style="color:var(--text2)">Mejoras</span><span style="color:#dc2626;font-weight:700">$${deudaMejoras.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>`:''}
+          ${deudaVivienda>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(220,38,38,.15)"><span style="color:var(--text2)">Vivienda</span><span style="color:#dc2626;font-weight:700">$${deudaVivienda.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>`:''}
+          ${deudaVarias>0?`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0"><span style="color:var(--text2)">Tasas Varias</span><span style="color:#dc2626;font-weight:700">$${deudaVarias.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>`:''}
+          <div style="display:flex;justify-content:space-between;font-size:14px;padding:8px 0 0;margin-top:4px;border-top:1px solid rgba(220,38,38,.2)"><span style="font-weight:600">Total</span><span style="color:#dc2626;font-weight:800">$${deudaTotal.toLocaleString('es-AR',{minimumFractionDigits:2})}</span></div>
         </div>
         <button onclick="document.getElementById('modal-libre-deuda').remove()"
           style="padding:9px 28px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer">Cerrar</button>
@@ -5330,6 +5337,9 @@ function rDeuda(a){
       <button onclick="window._deudaTab='tasa';abrirImportarDeudaActiva()" class="btn btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(45,95,168,.1);border-color:rgba(45,95,168,.3);color:#2d5fa8">📥 Tasa</button>
       <button onclick="window._deudaTab='cloaca';abrirImportarDeudaActiva()" class="btn btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(3,105,161,.1);border-color:rgba(3,105,161,.3);color:#0369a1">📥 Cloacas</button>
       <button onclick="window._deudaTab='rural';abrirImportarDeudaActiva()" class="btn btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(22,163,74,.1);border-color:rgba(22,163,74,.3);color:#16a34a">📥 Rural</button>
+      <button onclick="window._deudaTab='mejoras';abrirImportarDeudaActiva()" class="btn btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(124,58,237,.1);border-color:rgba(124,58,237,.3);color:#7c3aed">📥 Mejoras</button>
+      <button onclick="window._deudaTab='vivienda';abrirImportarDeudaActiva()" class="btn btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(194,65,12,.1);border-color:rgba(194,65,12,.3);color:#c2410c">📥 Vivienda</button>
+      <button onclick="window._deudaTab='varias';abrirImportarDeudaActiva()" class="btn btn-sm" style="font-size:10px;padding:4px 8px;background:rgba(190,24,93,.1);border-color:rgba(190,24,93,.3);color:#be185d">📥 Tasas Varias</button>
     </div>
   </div>`:'';
   a.innerHTML=hdr()+topnav('deuda')+`<div class="content">
@@ -5629,7 +5639,7 @@ function _toastOk(msg){
 
 function abrirImportarDeudaActiva(){
   const tab=window._deudaTab||'tasa';
-  const labels={tasa:'Tasa TGIU',cloaca:'Cloacas',rural:'Rural'};
+  const labels={tasa:'Tasa TGIU',cloaca:'Cloacas',rural:'Rural',mejoras:'Mejoras',vivienda:'Vivienda',varias:'Tasas Varias'};
   const hint=tab==='rural'?'nroCuenta,deuda  (o partida,deuda)':tab==='cloaca'?'nroCloaca,deuda  (o cuenta,deuda)':'padron,deuda  (o ctaTasa,deuda)';
   const modal=document.createElement('div');
   modal.id='modal-import-deuda';
@@ -5652,7 +5662,8 @@ function abrirImportarDeudaActiva(){
 }
 
 async function procesarImportDeudaActiva(tab){
-  const campo=tab==='tasa'?'deudaTasa':tab==='cloaca'?'deudaCloaca':'deudaRural';
+  const campoMap={tasa:'deudaTasa',cloaca:'deudaCloaca',rural:'deudaRural',mejoras:'deudaMejoras',vivienda:'deudaVivienda',varias:'deudaTasasVarias'};
+  const campo=campoMap[tab]||'deudaTasa';
   const f=document.getElementById('deuda-import-file');
   const st=document.getElementById('deuda-import-status');
   if(!f||!f.files.length){st.textContent='❌ Seleccioná un archivo CSV.';return;}
@@ -5742,6 +5753,7 @@ async function procesarImportDeudaActiva(tab){
   setTimeout(()=>pushToDrive(true),3000);
   const pct=ok>0?` (${Math.round(ok/(ok+miss)*100)}% match)`:'';
   st.textContent=`✅ ${ok} actualizados · ${miss} no encontrados${pct} — Subiendo a Drive...`;
+  if(['mejoras','vivienda','varias'].includes(tab)) window._deudaTab='tasa';
   setTimeout(()=>{document.getElementById('modal-import-deuda')?.remove();rDeuda(document.getElementById('app'));},2500);
 }
 
@@ -8150,7 +8162,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v42)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v43)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
