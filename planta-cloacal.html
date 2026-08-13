@@ -210,6 +210,7 @@ label.fld input:focus,label.fld select:focus,label.fld textarea:focus{outline:2p
       <button data-v="bitacora"><span class="ic">📖</span> Bitácora diaria</button>
       <div class="sep">Gestión</div>
       <button data-v="mantenimiento"><span class="ic">🔧</span> Mantenimiento</button>
+      <button data-v="tareas"><span class="ic">🔁</span> Tareas periódicas</button>
       <button data-v="inventario"><span class="ic">📦</span> Inventario</button>
       <button data-v="incidentes"><span class="ic">⚠️</span> Incidentes</button>
       <button data-v="camiones"><span class="ic">🚚</span> Camiones atmosféricos</button>
@@ -299,8 +300,17 @@ function estadoInicial(){
     },
     limites:limitesDefault(), _limitesUpd:0, _deleted:[],
     analisis:[], operacion:[], equipos:[], incidentes:[],
-    camiones:[], inspecciones:[], lagunas:[], inventario:[], bitacora:[]
+    camiones:[], inspecciones:[], lagunas:[], inventario:[], bitacora:[],
+    tareas:tareasDefault(), tareasLog:[]
   };
+}
+function tareasDefault(){
+  // ids fijos para que todos los equipos compartan las mismas tareas al sincronizar
+  return [
+    {id:"t_tirada", nombre:"Tirada de agua (red)", intervalo:45, aviso:7},
+    {id:"t_elev1",  nombre:"Limpieza elevadora Nº1", intervalo:20, aviso:4},
+    {id:"t_elev2",  nombre:"Limpieza elevadora Nº2", intervalo:20, aviso:4}
+  ];
 }
 function limitesDefault(){
   // Valores EDITABLES. Verificar contra Anexo B de la Ley 11220.
@@ -360,6 +370,24 @@ function proximaInspeccion(){
   const prox=isoDate(addDias(insp.fecha,S.config.frec.inspeccion));
   const rest=diasEntre(isoDate(hoy()),prox);
   return {ult:insp.fecha, prox, rest, estado:estadoPorDias(rest)};
+}
+function ultimaTarea(tareaId){
+  const l=(S.tareasLog||[]).filter(x=>x.tareaId===tareaId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return l[0]?l[0].fecha:null;
+}
+function estadoPorDiasTarea(rest,aviso){
+  aviso=aviso||7;
+  if(rest<0) return "rojo";
+  if(rest<=Math.max(2,Math.round(aviso*0.4))) return "naranja";
+  if(rest<=aviso) return "amarillo";
+  return "verde";
+}
+function proximaTarea(t){
+  const ult=ultimaTarea(t.id);
+  if(!ult) return {sin:true};
+  const prox=isoDate(addDias(ult,t.intervalo));
+  const rest=diasEntre(isoDate(hoy()),prox);
+  return {ult, prox, rest, estado:estadoPorDiasTarea(rest,t.aviso)};
 }
 function estadoPorDias(rest){
   if(rest<0) return "rojo";
@@ -426,6 +454,7 @@ VIEWS.dashboard=()=>{
   });
   if(c.biosolidos&&bio&&!bio.sin&&(bio.estado==="rojo"||bio.estado==="naranja")) avisos.push({n:"Biosólidos",p:bio});
   if(ins&&!ins.sin&&(ins.estado==="rojo"||ins.estado==="naranja")) avisos.push({n:"Inspección ENRESS",p:ins});
+  (S.tareas||[]).forEach(t=>{const p=proximaTarea(t);if(p&&!p.sin&&(p.estado==="rojo"||p.estado==="naranja"))avisos.push({n:t.nombre,p});});
   const nivelAviso=avisos.some(a=>a.p.estado==="rojo")?"rojo":avisos.some(a=>a.p.estado==="naranja")?"naranja":"amarillo";
 
   let html=`<h2 class="view-title">Panel de control</h2>
@@ -438,9 +467,10 @@ VIEWS.dashboard=()=>{
 
   html+=`<div class="card no-print" style="margin-bottom:16px">
     <h3 style="margin-bottom:10px">⚡ Carga diaria</h3>
-    <div class="grid qa-grid" style="grid-template-columns:repeat(4,1fr);gap:10px">
+    <div class="grid qa-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
       <button class="btn" style="justify-content:center;padding:14px" onclick="ir('bitacora')">📖 Anotar en bitácora</button>
       <button class="btn" style="justify-content:center;padding:14px" onclick="formOper()">✅ Registrar jornada</button>
+      <button class="btn sec" style="justify-content:center;padding:14px" onclick="ir('tareas')">🔁 Tareas periódicas</button>
       <button class="btn sec" style="justify-content:center;padding:14px" onclick="formInc()">⚠️ Cargar incidente</button>
       <button class="btn sec" style="justify-content:center;padding:14px" onclick="formLag()">🌊 Registro lagunas</button>
     </div>
@@ -469,6 +499,20 @@ VIEWS.dashboard=()=>{
     ${kpiSimple("Días sin incidentes","🛡️",diasSin>=0?diasSin:0,"desde "+fmtF(c.diaCeroIncidentes))}
     ${kpiSimple("Análisis registrados","📋",S.analisis.length,"en total")}
   </div>`;
+
+  html+=`<div class="card" style="margin-bottom:18px"><div class="head-row" style="margin-bottom:10px"><h3>🔁 Tareas periódicas</h3>
+      <button class="btn sec no-print" onclick="ir('tareas')">Ver / registrar</button></div>`;
+  if((S.tareas||[]).length){
+    html+=`<table><thead><tr><th>Tarea</th><th>Cada</th><th>Última</th><th>Próxima</th><th>Estado</th></tr></thead><tbody>`;
+    (S.tareas||[]).forEach(t=>{const p=proximaTarea(t);
+      let est,ult,prox;
+      if(p.sin){est='<span class="chip c-gris">Sin registro</span>';ult="—";prox="—";}
+      else{const txt=p.rest<0?`atrasada ${Math.abs(p.rest)} d`:`en ${p.rest} d`;est=`<span class="chip c-${p.estado}">${txt}</span>`;ult=fmtF(p.ult);prox=fmtF(p.prox);}
+      html+=`<tr><td><b>${t.nombre}</b></td><td>${t.intervalo} d</td><td>${ult}</td><td>${prox}</td><td>${est}</td></tr>`;
+    });
+    html+=`</tbody></table>`;
+  }else html+=`<div class="vacio" style="padding:20px"><span class="em">🔁</span>Sin tareas periódicas cargadas.</div>`;
+  html+=`</div>`;
 
   html+=`<div class="grid g-2">
     <div class="card"><div class="head-row" style="margin-bottom:10px"><h3>Últimos análisis realizados</h3>
@@ -788,6 +832,99 @@ function formEquipo(id){
     if(id)S.equipos=S.equipos.map(x=>x.id===id?obj:x);else S.equipos.push(obj);
     guardar();renderMant();return true;
   });
+}
+
+/* ============================================================
+   MÓDULO · TAREAS PERIÓDICAS (tirada de agua, limpieza elevadoras, etc.)
+   ============================================================ */
+POST.tareas=()=>renderTareas();
+VIEWS.tareas=()=>`
+  <div class="head-row"><div><h2 class="view-title">Tareas periódicas</h2>
+    <div class="view-sub">Tareas de mantenimiento que se repiten con su propio ciclo. La app avisa cuando toca.</div></div>
+    <button class="btn" onclick="formTarea()">＋ Nueva tarea</button></div>
+  <div id="tblTareas"></div>`;
+function renderTareas(){
+  if(!document.getElementById("tblTareas")){if(vistaActual==='dashboard')ir('dashboard');return;}
+  const list=(S.tareas||[]).slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  let html;
+  if(!list.length)html=`<div class="tabla-wrap"><div class="vacio"><span class="em">🔁</span>Sin tareas periódicas. Agregá la primera.</div></div>`;
+  else{
+    html=`<div class="grid g-2">`;
+    list.forEach(t=>{
+      const p=proximaTarea(t);
+      let estadoHtml,detalle;
+      if(p.sin){estadoHtml=`<span class="chip c-gris">Sin registro</span>`;detalle=`Nunca registrada. Cargá la última vez que se hizo.`;}
+      else{
+        const txt=p.rest<0?`Atrasada ${Math.abs(p.rest)} día(s)`:`Faltan ${p.rest} día(s)`;
+        estadoHtml=`<span class="chip c-${p.estado}">${txt}</span>`;
+        detalle=`Última: ${fmtF(p.ult)} · Próxima: <b>${fmtF(p.prox)}</b>`;
+      }
+      html+=`<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div><h3 style="font-size:15px">${t.nombre}</h3>
+            <div style="color:var(--gris);font-size:12px;margin-top:2px">Cada ${t.intervalo} días · avisa ${t.aviso} días antes</div></div>
+          ${estadoHtml}
+        </div>
+        <div style="margin:10px 0;font-size:13px">${detalle}</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn" style="padding:9px 13px" onclick="marcarTarea('${t.id}')">✔ Registrar realizada</button>
+          <button class="mini" onclick="historialTarea('${t.id}')">Historial</button>
+          <button class="mini" onclick="formTarea('${t.id}')">Editar</button>
+          <button class="mini del" onclick="borrar('tareas','${t.id}')">✕</button>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  document.getElementById("tblTareas").innerHTML=html;
+}
+function formTarea(id){
+  const t=id?(S.tareas||[]).find(x=>x.id===id):null;
+  abrirModal(id?"Editar tarea periódica":"Nueva tarea periódica",`
+    <label class="fld f-1" style="margin-bottom:12px"><span>Nombre de la tarea *</span><input id="i_nom" value="${t?t.nombre||"":""}" placeholder="Ej. Tirada de agua"></label>
+    <div class="f-row">
+      <label class="fld"><span>Se repite cada (días) *</span><input type="number" id="i_int" value="${t?t.intervalo:30}"></label>
+      <label class="fld"><span>Avisar cuántos días antes</span><input type="number" id="i_avi" value="${t?t.aviso:5}"></label>
+    </div>
+    <p class="hint">Ejemplos: tirada de agua cada 45 días; limpieza de elevadora cada 20 días.</p>
+  `,()=>{
+    const nombre=document.getElementById("i_nom").value.trim();if(!nombre){alert("El nombre es obligatorio");return false;}
+    const intervalo=+document.getElementById("i_int").value||30;
+    const aviso=+document.getElementById("i_avi").value||5;
+    const obj={id:id||uid(),nombre,intervalo,aviso};
+    S.tareas=S.tareas||[];
+    if(id)S.tareas=S.tareas.map(x=>x.id===id?obj:x);else S.tareas.push(obj);
+    guardar();renderTareas();return true;
+  });
+}
+function marcarTarea(tareaId){
+  const t=(S.tareas||[]).find(x=>x.id===tareaId);if(!t)return;
+  abrirModal("Registrar: "+t.nombre,`
+    <div class="f-row">
+      <label class="fld"><span>Fecha en que se hizo *</span><input type="date" id="i_fecha" value="${isoDate(hoy())}"></label>
+      <label class="fld"><span>Responsable</span><input id="i_resp" placeholder="Quién la hizo"></label>
+    </div>
+    <label class="fld f-1"><span>Observaciones</span><textarea id="i_obs" placeholder="Opcional"></textarea></label>
+  `,()=>{
+    const fecha=document.getElementById("i_fecha").value;if(!fecha){alert("La fecha es obligatoria");return false;}
+    S.tareasLog=S.tareasLog||[];
+    S.tareasLog.push({id:uid(),tareaId,fecha,responsable:document.getElementById("i_resp").value.trim(),obs:document.getElementById("i_obs").value.trim()});
+    guardar();renderTareas();return true;
+  });
+}
+function historialTarea(tareaId){
+  const t=(S.tareas||[]).find(x=>x.id===tareaId);if(!t)return;
+  const logs=(S.tareasLog||[]).filter(x=>x.tareaId===tareaId).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  let body;
+  if(!logs.length)body=`<div class="vacio" style="padding:20px"><span class="em">📋</span>Todavía no se registró ninguna vez.</div>`;
+  else{
+    body=`<table><thead><tr><th>Fecha</th><th>Responsable</th><th>Observaciones</th><th></th></tr></thead><tbody>`;
+    logs.forEach(l=>body+=`<tr><td>${fmtF(l.fecha)}</td><td>${l.responsable||"—"}</td><td>${l.obs||"—"}</td>
+      <td><button class="mini del" onclick="if(confirm('¿Borrar este registro?')){S._deleted.push({col:'tareasLog',id:'${l.id}',ts:Date.now()});S.tareasLog=S.tareasLog.filter(x=>x.id!=='${l.id}');guardar();historialTarea('${tareaId}');renderTareas();}">✕</button></td></tr>`);
+    body+=`</tbody></table>`;
+  }
+  abrirModal("Historial: "+t.nombre,body,()=>true);
+  document.getElementById("modalSave").style.display="none";
 }
 
 /* ============================================================
@@ -1150,6 +1287,11 @@ VIEWS.informe=()=>{
   if(mant.length){h+=`<table style="margin-bottom:18px"><thead><tr><th>Equipo</th><th>Último service</th><th>Estado</th></tr></thead><tbody>`;
     mant.forEach(e=>h+=`<tr><td>${e.nombre}</td><td>${fmtF(e.ultService)}</td><td>${e.estado||"—"}</td></tr>`);h+=`</tbody></table>`;}
   else h+=`<p style="color:var(--gris);margin-bottom:18px">Sin services registrados en el período.</p>`;
+  const tareasHechas=(S.tareasLog||[]).filter(x=>x.fecha>=desde).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  h+=`<h3 style="color:var(--agua-800);margin-bottom:8px">7. Tareas periódicas realizadas</h3>`;
+  if(tareasHechas.length){h+=`<table style="margin-bottom:18px"><thead><tr><th>Fecha</th><th>Tarea</th><th>Responsable</th></tr></thead><tbody>`;
+    tareasHechas.forEach(l=>{const t=(S.tareas||[]).find(x=>x.id===l.tareaId)||{};h+=`<tr><td>${fmtF(l.fecha)}</td><td>${t.nombre||"—"}</td><td>${l.responsable||"—"}</td></tr>`;});h+=`</tbody></table>`;}
+  else h+=`<p style="color:var(--gris);margin-bottom:18px">Sin tareas periódicas registradas en el período.</p>`;
   h+=`<div style="margin-top:30px;display:flex;justify-content:space-around;text-align:center;color:var(--gris);font-size:12px">
       <div>_______________________<br>Responsable de planta</div>
       <div>_______________________<br>Presidente Comunal</div></div>`;
@@ -1255,6 +1397,7 @@ let modalSaveFn=null;
 function abrirModal(titulo,html,onSave){
   document.getElementById("modalTitle").textContent=titulo;
   document.getElementById("modalBody").innerHTML=html;
+  document.getElementById("modalSave").style.display=""; // reponer por si el historial lo ocultó
   modalSaveFn=onSave;
   document.getElementById("modalBg").classList.add("open");
 }
@@ -1262,7 +1405,7 @@ function cerrarModal(){document.getElementById("modalBg").classList.remove("open
 document.getElementById("modalSave").addEventListener("click",()=>{if(modalSaveFn){const r=modalSaveFn();if(r!==false)cerrarModal();}});
 document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")cerrarModal();});
 function borrar(col,id){if(!confirm("¿Eliminar este registro?"))return;S._deleted=S._deleted||[];S._deleted.push({col,id,ts:Date.now()});S[col]=S[col].filter(x=>x.id!==id);guardar();
-  const map={analisis:renderAnalisis,operacion:renderOper,equipos:renderMant,incidentes:renderInc,camiones:renderCam,inspecciones:renderInsp,lagunas:renderLag,inventario:renderInv,bitacora:renderBita};
+  const map={analisis:renderAnalisis,operacion:renderOper,equipos:renderMant,incidentes:renderInc,camiones:renderCam,inspecciones:renderInsp,lagunas:renderLag,inventario:renderInv,bitacora:renderBita,tareas:renderTareas,tareasLog:renderTareas};
   if(map[col])map[col]();}
 function exportarJSON(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
@@ -1311,10 +1454,20 @@ async function doSync(origen){
 }
 function aplicarRemoto(datos,forzarRender){
   const url=S.config.syncUrl;
+  const prev=S;                       // estado local actual
   const antes=localStorage.getItem(KEY);
-  S=Object.assign(estadoInicial(),datos);
-  if(!S.config.syncUrl)S.config.syncUrl=url;
-  S._deleted=datos._deleted||[];
+  const nuevo=Object.assign(estadoInicial(),datos);
+  // Salvaguarda: si el servidor NO devolvió una colección (backend viejo) pero
+  // localmente había datos, se conservan. Si el servidor la devuelve vacía ([]),
+  // se respeta (fue borrada a propósito).
+  ["analisis","operacion","equipos","incidentes","camiones","inspecciones",
+   "lagunas","inventario","bitacora","tareas","tareasLog"].forEach(col=>{
+    const servTiene=datos&&Array.isArray(datos[col]);
+    if(!servTiene&&Array.isArray(prev[col])&&prev[col].length){ nuevo[col]=prev[col]; }
+  });
+  if(!nuevo.config.syncUrl)nuevo.config.syncUrl=url;
+  nuevo._deleted=datos._deleted||prev._deleted||[];
+  S=nuevo;
   const ahora=JSON.stringify(S);
   localStorage.setItem(KEY,ahora); // guardar sin re-disparar sync
   document.getElementById("brandLoc").textContent=S.config.localidad;
