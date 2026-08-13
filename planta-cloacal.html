@@ -220,7 +220,7 @@ label.fld input:focus,label.fld select:focus,label.fld textarea:focus{outline:2p
       <button data-v="informe"><span class="ic">🖨️</span> Informe ENRESS</button>
       <button data-v="config"><span class="ic">⚙️</span> Configuración</button>
     </nav>
-    <div class="pie">v1.1 · <a href="#" id="linkBackup" style="color:#7fd0da">Copia de seguridad</a></div>
+    <div class="pie"><b style="color:#fff">Versión 1.3</b> · <a href="#" id="linkBackup" style="color:#7fd0da">Copia de seguridad</a></div>
   </aside>
 
   <div class="main">
@@ -1490,6 +1490,7 @@ async function probarSync(){
 setInterval(()=>{if(S.config&&S.config.syncUrl&&!syncing&&!modalAbierto())doSync("periodico");},45000);
 
 /* Arranque */
+console.log("%cPlanta Cloacal · Versión 1.3","font-size:16px;color:#0f4c5c;font-weight:bold");
 ir("dashboard");
 if(S.config&&S.config.syncUrl){doSync("startup");}else{setSyncStatus("off","Solo este equipo");}
 </script>
