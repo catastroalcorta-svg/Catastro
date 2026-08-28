@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v49</title>
+<title>Catastro Municipal — Alcorta v50</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1603,7 +1603,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v49</span>
+      <span class="hdr-logo">ALCORTA v50</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -8197,7 +8197,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v49)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v50)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
@@ -9420,23 +9420,11 @@ function borrarDibujoActual(){
   if(!curRec||!curRec.padron){alert('Abrí primero el padrón cuyo dibujo querés borrar.');return;}
   const padron=String(curRec.padron);
   const handle=geoLinks[padron];
-  let idx=parcelasNuevas.findIndex(np=>np&&(np.handle===handle||(np.padron&&String(np.padron)===padron)));
-  const h=handle||(idx>=0?parcelasNuevas[idx].handle:'');
-  if(!h && idx<0){alert('Esta parcela no tiene un dibujo para borrar.');return;}
-  if(!confirm('¿Borrar el dibujo de la parcela del padrón '+padron+'?\nSe quita el polígono, su vínculo y su lugar en la manzana.'))return;
-  // 1) parcelasNuevas
-  if(idx>=0) parcelasNuevas.splice(idx,1);
-  if(h) parcelasNuevas=parcelasNuevas.filter(np=>!(np&&np.handle===h));
-  try{localStorage.setItem('catastro_parcelas_nuevas',JSON.stringify(parcelasNuevas));}catch(e){}
-  // 2) feature del plano
-  if(h&&geoData&&geoData.features){ geoData.features=geoData.features.filter(f=>!(f.properties&&f.properties.handle===h)); }
-  // 3) capa del mapa
-  if(h&&parcelLayer){ try{parcelLayer.eachLayer(l=>{ if(l.feature&&l.feature.properties&&l.feature.properties.handle===h) parcelLayer.removeLayer(l); });}catch(e){} }
+  const existe=parcelasNuevas.some(np=>np&&(np.handle===handle||(np.padron&&String(np.padron)===padron)));
+  if(!existe && !handle){alert('Esta parcela no tiene un dibujo para borrar.');return;}
+  if(!confirm('¿Borrar el dibujo de la parcela del padrón '+padron+'?\nSe quita el polígono, su vínculo y su lugar en la manzana. Se sincroniza a Drive.'))return;
+  _borrarDibujoPorHandleOId({handle:handle, padron:padron});
   if(curParcelLayer){try{leafMap.removeLayer(curParcelLayer);}catch(e){}curParcelLayer=null;}
-  // 4) manzana
-  if(h&&Array.isArray(mzData)){ let toc=false; mzData.forEach(mz=>{ if(Array.isArray(mz.lotes)&&mz.lotes.includes(h)){ mz.lotes=mz.lotes.filter(x=>x!==h); toc=true; } }); if(toc){try{localStorage.setItem(MZ_DATA_KEY,JSON.stringify(mzData));}catch(e){}} }
-  // 5) vínculo
-  if(geoLinks[padron]===h){ delete geoLinks[padron]; saveGeoLinks(); if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(padron,''); }
   if(leafMap) try{leafMap.setView([-33.5403,-61.1221],16);}catch(e){}
   const st=document.getElementById('map-status'); if(st) st.textContent='🗑 Dibujo borrado del padrón '+padron+'. Podés volver a dibujarlo.';
   alert('✅ Dibujo borrado. Ya podés dibujarlo de nuevo.');
@@ -9473,20 +9461,40 @@ function cancelarDraw(){
   const hint=document.getElementById('draw-hint');if(hint)hint.style.display='none';
 }
 
-function eliminarParcelaNueva(id){
-  if(!confirm('¿Eliminar esta nueva parcela del mapa?'))return;
-  parcelasNuevas=parcelasNuevas.filter(p=>p.id!==id);
+// Borrado COMPLETO de un dibujo: lo saca de parcelasNuevas, del plano, del mapa, de la manzana,
+// quita el vínculo del padrón y SINCRONIZA a Drive (para que no vuelva al recargar).
+function _borrarDibujoPorHandleOId(opts){
+  const id=opts.id||'', padronIn=opts.padron||'';
+  let handle=opts.handle||'';
+  // resolver el dibujo y su handle
+  let np=null;
+  if(id) np=parcelasNuevas.find(p=>p&&p.id===id);
+  if(!np && handle) np=parcelasNuevas.find(p=>p&&p.handle===handle);
+  if(!handle && np) handle=np.handle||'';
+  const h=handle;
+  // 1) parcelasNuevas
+  parcelasNuevas=parcelasNuevas.filter(p=>!(p&&((id&&p.id===id)||(h&&p.handle===h))));
   try{localStorage.setItem('catastro_parcelas_nuevas',JSON.stringify(parcelasNuevas));}catch(e){}
-  // Refrescar mapa
-  if(drawnItems&&leafMap){
-    leafMap.removeLayer(drawnItems);
-    drawnItems=new L.FeatureGroup().addTo(leafMap);
-    parcelasNuevas.forEach(p=>{
-      const layer=L.polygon(p.latlngs,{color:'#e05c00',fillColor:'#ffd166',fillOpacity:0.5,weight:2});
-      layer.bindPopup('<b>Nueva parcela</b><br>'+p.nota+'<br><button onclick="eliminarParcelaNueva(\''+p.id+'\')">🗑 Eliminar</button>');
-      drawnItems.addLayer(layer);
-    });
-  }
+  // 2) feature del plano
+  if(h&&geoData&&geoData.features){ geoData.features=geoData.features.filter(f=>!(f.properties&&f.properties.handle===h)); }
+  // 3) capa del mapa
+  if(h&&parcelLayer){ try{parcelLayer.eachLayer(l=>{ if(l.feature&&l.feature.properties&&l.feature.properties.handle===h) parcelLayer.removeLayer(l); });}catch(e){} }
+  // 4) manzana
+  if(h&&Array.isArray(mzData)){ let toc=false; mzData.forEach(mz=>{ if(Array.isArray(mz.lotes)&&mz.lotes.includes(h)){ mz.lotes=mz.lotes.filter(x=>x!==h); toc=true; } }); if(toc){try{localStorage.setItem(MZ_DATA_KEY,JSON.stringify(mzData));}catch(e){}} }
+  // 5) vínculo (por padrón conocido o buscando el que apunte a este handle)
+  let padVinc=padronIn||(np&&np.padron)||'';
+  if((!padVinc||geoLinks[padVinc]!==h) && h){ const k=Object.keys(geoLinks).find(k=>geoLinks[k]===h); if(k)padVinc=k; }
+  if(padVinc && geoLinks[padVinc]===h){ delete geoLinks[padVinc]; saveGeoLinks(); if(DRIVE_API_URL&&DRIVE_TOKEN) pushGeoLinkToDrive(padVinc,''); }
+  // 6) sincronizar a Drive (para que el borrado no se revierta al recargar)
+  if(DRIVE_API_URL&&DRIVE_TOKEN){ clearTimeout(window._backupDibujoTO); window._backupDibujoTO=setTimeout(()=>{ try{pushToDrive(true);}catch(e){} }, 1500); }
+  return {h, padVinc};
+}
+
+function eliminarParcelaNueva(id){
+  if(!confirm('¿Eliminar esta división dibujada?\nSe quita el polígono del mapa, su vínculo y su lugar en la manzana. Se sincroniza a Drive.'))return;
+  const r=_borrarDibujoPorHandleOId({id});
+  if(typeof render==='function') render();
+  alert('✅ División eliminada'+(r.padVinc?' (padrón '+r.padVinc+' desvinculado)':'')+'.');
 }
 
 function exportarParcelasNuevas(){
