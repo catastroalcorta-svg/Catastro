@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Órdenes de Pago · Comuna de Alcorta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#17212e;
+    --ink-2:#3a4a5c;
+    --muted:#6b7885;
+    --line:#dbe0e6;
+    --line-strong:#c3cbd4;
+    --bg:#eef1f4;
+    --surface:#ffffff;
+    --brand:#1f3550;          /* navy institucional */
+    --brand-d:#152538;
+    --bordo:#8b2635;          /* acento oficial */
+    --focus:#2563eb;
+
+    --st-borr:#64748b; --st-borr-bg:#eef1f4;
+    --st-auth:#b45309; --st-auth-bg:#fef3c7;
+    --st-pag:#15803d;  --st-pag-bg:#dcfce7;
+    --st-anul:#b91c1c; --st-anul-bg:#fee2e2;
+
+    --r:10px; --r-sm:7px;
+    --sh:0 1px 2px rgba(23,33,46,.06), 0 4px 14px rgba(23,33,46,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color:var(--ink); background:var(--bg);
+    -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.45;
+  }
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:15px}
+  h1,h2,h3{margin:0}
+  .hidden{display:none !important}
+
+  /* ---------- Botones ---------- */
+  .btn{
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
+    padding:9px 14px; border-radius:var(--r-sm); font-weight:600; font-size:14px;
+    display:inline-flex; align-items:center; gap:7px; transition:.12s; white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--ink-2)}
+  .btn:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
+  .btn-primary{background:var(--brand); border-color:var(--brand); color:#fff}
+  .btn-primary:hover{background:var(--brand-d); border-color:var(--brand-d)}
+  .btn-ok{background:var(--st-pag); border-color:var(--st-pag); color:#fff}
+  .btn-ok:hover{filter:brightness(.94)}
+  .btn-warn{background:var(--st-auth); border-color:var(--st-auth); color:#fff}
+  .btn-warn:hover{filter:brightness(.94)}
+  .btn-danger{background:#fff; border-color:#e3b3b3; color:var(--st-anul)}
+  .btn-danger:hover{background:var(--st-anul-bg)}
+  .btn-ghost{border-color:transparent;background:transparent;color:var(--ink-2)}
+  .btn-ghost:hover{background:#e4e8ed}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-sm{padding:6px 10px;font-size:13px}
+  .btn-block{width:100%;justify-content:center}
+
+  /* ---------- Login ---------- */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login-card{
+    width:100%;max-width:390px;background:var(--surface);border-radius:14px;
+    box-shadow:var(--sh);overflow:hidden;border:1px solid var(--line)
+  }
+  .login-head{background:var(--brand);color:#fff;padding:26px 26px 22px;text-align:center}
+  .crest{width:54px;height:54px;margin:0 auto 12px;display:block}
+  .login-head .lt{font-family:'Lora',serif;font-weight:600;font-size:19px;letter-spacing:.3px}
+  .login-head .ls{font-size:12.5px;opacity:.82;margin-top:3px}
+  .login-body{padding:24px 26px 26px}
+  .field{margin-bottom:15px}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+  .ctl{
+    width:100%;padding:11px 12px;border:1px solid var(--line-strong);border-radius:var(--r-sm);
+    background:#fff;color:var(--ink);transition:.12s
+  }
+  .ctl:focus{outline:none;border-color:var(--focus);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+  .login-msg{min-height:18px;font-size:13px;color:var(--st-anul);margin:2px 0 12px}
+  .login-foot{font-size:11.5px;color:var(--muted);text-align:center;padding:0 26px 20px}
+
+  /* ---------- Layout app ---------- */
+  .topbar{
+    background:var(--brand);color:#fff;position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:14px;padding:10px 18px
+  }
+  .topbar .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .topbar .brand .crest{width:32px;height:32px;margin:0}
+  .topbar .tt{font-family:'Lora',serif;font-weight:600;font-size:16px;line-height:1.1}
+  .topbar .ts{font-size:11px;opacity:.8}
+  .topbar .spacer{flex:1}
+  .whoami{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;text-align:right}
+  .whoami .wn{font-weight:600;font-size:13.5px}
+  .whoami .wr{font-size:11px;opacity:.82;text-transform:capitalize}
+  .icon-btn{background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:var(--r-sm);padding:8px 10px;font-size:13px;font-weight:600}
+  .icon-btn:hover{background:rgba(255,255,255,.12)}
+
+  .container{max-width:1080px;margin:0 auto;padding:20px 18px 60px}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px}
+  .search{flex:1;min-width:200px;position:relative}
+  .search input{padding-left:36px}
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .chip{
+    border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:7px 13px;
+    font-size:13px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px
+  }
+  .chip .n{background:var(--bg);border-radius:999px;padding:1px 8px;font-size:12px;color:var(--muted)}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip.active .n{background:rgba(255,255,255,.2);color:#fff}
+
+  /* ---------- Lista ---------- */
+  .list{display:flex;flex-direction:column;gap:10px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);padding:14px 16px;display:grid;
+    grid-template-columns:auto 1fr auto;gap:14px;align-items:center
+  }
+  .num-badge{
+    font-family:'Lora',serif;font-weight:700;font-size:16px;color:var(--brand);
+    min-width:64px;text-align:center;line-height:1.1
+  }
+  .num-badge small{display:block;font-family:'Inter';font-weight:600;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  .card .main{min-width:0}
+  .card .benef{font-weight:600;font-size:15.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .concepto{color:var(--muted);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .card .meta{font-size:12px;color:var(--muted);margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 12px}
+  .card .right{display:flex;flex-direction:column;align-items:flex-end;gap:9px}
+  .importe{font-family:'Lora',serif;font-weight:700;font-size:18px;color:var(--ink);white-space:nowrap}
+  .row-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+
+  .tag{border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+  .tag.borrador{color:var(--st-borr);background:var(--st-borr-bg)}
+  .tag.autorizada{color:var(--st-auth);background:var(--st-auth-bg)}
+  .tag.pagada{color:var(--st-pag);background:var(--st-pag-bg)}
+  .tag.anulada{color:var(--st-anul);background:var(--st-anul-bg)}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+  .empty svg{opacity:.35;margin-bottom:12px}
+  .empty h3{font-size:16px;color:var(--ink-2);margin-bottom:4px}
+
+  /* ---------- Modal ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(15,23,35,.5);z-index:40;display:flex;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto}
+  .modal{background:var(--surface);border-radius:14px;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.28);overflow:hidden;animation:pop .16s ease}
+  .modal.wide{max-width:820px}
+  @keyframes pop{from{transform:translateY(8px) scale(.99);opacity:0}to{transform:none;opacity:1}}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .modal-head h2{font-size:17px;font-family:'Lora',serif;font-weight:600}
+  .modal-body{padding:20px;max-height:66vh;overflow:auto}
+  .modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .x{background:none;border:none;font-size:22px;color:var(--muted);line-height:1;padding:2px 6px;border-radius:6px}
+  .x:hover{background:var(--bg);color:var(--ink)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid2 .full{grid-column:1/-1}
+  .hint{font-size:12px;color:var(--muted);margin-top:5px}
+  .letras{font-size:12.5px;color:var(--brand);font-weight:600;margin-top:6px;font-style:italic}
+  textarea.ctl{resize:vertical;min-height:64px}
+
+  /* ---------- Documento imprimible ---------- */
+  .doc{background:#fff;color:#111;border:1px solid var(--line);padding:34px 40px;font-size:14px}
+  .doc-head{display:flex;align-items:flex-start;gap:16px;border-bottom:2px solid #111;padding-bottom:14px}
+  .doc-head .crest{width:58px;height:58px;margin:0}
+  .doc-head .org{flex:1}
+  .doc-head .org h1{font-family:'Lora',serif;font-size:22px;letter-spacing:1px}
+  .doc-head .org p{margin:1px 0;font-size:12px;color:#333;text-transform:uppercase;letter-spacing:.5px}
+  .doc-head .np{text-align:right}
+  .doc-head .np .t{font-family:'Lora',serif;font-size:14px;letter-spacing:2px}
+  .doc-head .np .n{font-family:'Lora',serif;font-size:26px;font-weight:700;color:var(--bordo)}
+  .doc .place{text-align:right;margin:14px 0 22px;font-size:13px}
+  .doc-row{display:flex;gap:8px;margin-bottom:12px;align-items:baseline}
+  .doc-row .k{font-weight:700;white-space:nowrap}
+  .doc-row .v{flex:1;border-bottom:1px dotted #999;min-height:20px}
+  .doc-imp{display:flex;justify-content:flex-end;gap:10px;align-items:center;margin:8px 0 4px}
+  .doc-imp .box{border:1.5px solid #111;padding:8px 16px;font-family:'Lora',serif;font-size:20px;font-weight:700}
+  .doc-letras{font-size:12.5px;font-style:italic;color:#333;margin-bottom:26px}
+  .doc-signs{display:flex;justify-content:space-between;gap:40px;margin-top:56px}
+  .doc-signs .sign{flex:1;text-align:center;font-size:12px}
+  .doc-signs .line{border-top:1px solid #111;margin-bottom:5px}
+  .doc-signs .role{font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .doc-signs .name{color:#333}
+  .doc-status-note{margin-top:20px;font-size:11px;color:#666;text-align:center;border-top:1px solid #ddd;padding-top:10px}
+
+  /* ---------- Admin usuarios ---------- */
+  .utable{width:100%;border-collapse:collapse;font-size:14px}
+  .utable th,.utable td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+  .utable th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+  .role-pill{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--ink-2);text-transform:capitalize}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:60;
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:var(--r-sm);
+    font-size:14px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;
+    transition:.2s;pointer-events:none
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  .toast.err{background:var(--st-anul)}
+
+  .loader{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);gap:14px}
+  .spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  @media(max-width:640px){
+    .card{grid-template-columns:auto 1fr;gap:10px}
+    .card .right{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+    .grid2{grid-template-columns:1fr}
+    .doc{padding:22px}
+    .doc-head{flex-wrap:wrap}
+  }
+
+  /* ---------- Impresión ---------- */
+  @media print{
+    body{background:#fff}
+    .topbar,.toolbar,.chips,.list,.modal-head,.modal-foot,.no-print{display:none !important}
+    .overlay{position:static;padding:0;background:none;overflow:visible}
+    .modal,.modal.wide{max-width:none;box-shadow:none;border-radius:0}
+    .modal-body{max-height:none;overflow:visible;padding:0}
+    .doc{border:none;padding:0}
+    @page{margin:16mm}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= LOGIN ======================= -->
+<div id="loginView" class="login-wrap hidden">
+  <div class="login-card">
+    <div class="login-head">
+      <svg class="crest" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" fill="#fff" opacity=".95"/><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" stroke="#1f3550" stroke-width="1"/><text x="12" y="15" font-size="8" font-weight="700" fill="#1f3550" text-anchor="middle" font-family="Lora,serif">CA</text></svg>
+      <div class="lt">Órdenes de Pago</div>
+      <div class="ls">Comuna de Alcorta · Santa Fe</div>
+    </div>
+    <div class="login-body">
+      <div class="field">
+        <label for="loginUser">Usuario</label>
+        <select id="loginUser" class="ctl"></select>
+      </div>
+      <div class="field">
+        <label for="loginPin">PIN</label>
+        <input id="loginPin" class="ctl" type="password" inputmode="numeric" autocomplete="off" placeholder="••••">
+      </div>
+      <div id="loginMsg" class="login-msg"></div>
+      <button id="loginBtn" class="btn btn-primary btn-block">Ingresar</button>
+    </div>
+    <div class="login-foot" id="loginFoot"></div>
+  </div>
+</div>
+
+<!-- ======================= APP ======================= -->
+<div id="appView" class="hidden">
+  <div class="topbar">
+    <div class="brand">
+      <svg class="crest" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" fill="#fff" opacity=".95"/><text x="12" y="15" font-size="8" font-weight="700" fill="#1f3550" text-anchor="middle" font-family="Lora,serif">CA</text></svg>
+      <div>
+        <div class="tt">Órdenes de Pago</div>
+        <div class="ts">Comuna de Alcorta</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="whoami">
+      <span class="wn" id="waName"></span>
+      <span class="wr" id="waRole"></span>
+    </div>
+    <button id="adminBtn" class="icon-btn hidden">Usuarios</button>
+    <button id="logoutBtn" class="icon-btn">Salir</button>
+  </div>
+
+  <div class="container">
+    <div class="toolbar">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="search" class="ctl" placeholder="Buscar por beneficiario, concepto o N°…">
+      </div>
+      <button id="newBtn" class="btn btn-primary hidden">+ Nueva orden</button>
+    </div>
+
+    <div class="chips" id="chips"></div>
+
+    <div id="listWrap"></div>
+  </div>
+</div>
+
+<div id="loadingView" class="loader">
+  <div class="spin"></div>
+  <div>Conectando…</div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" class="toast"></div>
+
+<!-- ======================= Firebase ======================= -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+/* ============================================================
+   CONFIG FIREBASE  ← REEMPLAZAR con los datos de tu proyecto
+   (podés crear un proyecto nuevo "ordenes-pago-alcorta" o
+    reutilizar uno existente; los datos quedan bajo la rama ROOT)
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "TU_API_KEY",
+  authDomain: "ordenes-pago-alcorta.firebaseapp.com",
+  databaseURL: "https://ordenes-pago-alcorta-default-rtdb.firebaseio.com",
+  projectId: "ordenes-pago-alcorta",
+  storageBucket: "ordenes-pago-alcorta.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:xxxxxxxxxxxx"
+};
+const ROOT = 'opAlcorta';              // rama raíz dentro de la base
+const NUMERO_INICIAL_DEFAULT = 1;      // el 1er número de orden
+
+/* ============================================================
+   Estado global
+   ============================================================ */
+let db, refRoot, refUsuarios, refOrdenes, refConfig;
+let usuarios = {};      // uid -> {nombre, rol, pin}
+let ordenes = {};       // id  -> orden
+let configData = {};    // {correlativo, numeroInicial}
+let currentUser = null; // {uid, nombre, rol}
+let filtro = 'todas';
+let busqueda = '';
+
+const FORMAS_PAGO = ['Efectivo','Transferencia','Cheque','Débito bancario','Otro'];
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+
+/* ============================================================
+   Utilidades
+   ============================================================ */
+function fmtMoneda(n){
+  const v = Number(n)||0;
+  return '$ ' + v.toLocaleString('es-AR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtFecha(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function fmtFechaLarga(iso){
+  const d = iso ? new Date(iso) : new Date();
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `Alcorta, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
+}
+function toast(msg, err){
+  const t = $('#toast'); t.textContent = msg;
+  t.className = 'toast show' + (err?' err':'');
+  clearTimeout(t._to); t._to = setTimeout(()=>t.className='toast', 2600);
+}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ---- Número a letras (pesos) ---- */
+function numeroALetras(num){
+  function Unidades(n){
+    switch(n){case 1:return'UN';case 2:return'DOS';case 3:return'TRES';case 4:return'CUATRO';
+      case 5:return'CINCO';case 6:return'SEIS';case 7:return'SIETE';case 8:return'OCHO';case 9:return'NUEVE';}
+    return '';
+  }
+  function DecenasY(str,u){return u>0 ? str+' Y '+Unidades(u) : str;}
+  function Decenas(num){
+    const d=Math.floor(num/10), u=num-d*10;
+    switch(d){
+      case 1:
+        switch(u){case 0:return'DIEZ';case 1:return'ONCE';case 2:return'DOCE';case 3:return'TRECE';
+          case 4:return'CATORCE';case 5:return'QUINCE';default:return'DIECI'+Unidades(u);}
+      case 2: return u===0 ? 'VEINTE' : 'VEINTI'+Unidades(u);
+      case 3: return DecenasY('TREINTA',u);
+      case 4: return DecenasY('CUARENTA',u);
+      case 5: return DecenasY('CINCUENTA',u);
+      case 6: return DecenasY('SESENTA',u);
+      case 7: return DecenasY('SETENTA',u);
+      case 8: return DecenasY('OCHENTA',u);
+      case 9: return DecenasY('NOVENTA',u);
+      default: return Unidades(u);
+    }
+  }
+  function Centenas(num){
+    const c=Math.floor(num/100), r=num-c*100;
+    switch(c){
+      case 1: return r>0 ? 'CIENTO '+Decenas(r) : 'CIEN';
+      case 2: return ('DOSCIENTOS '+Decenas(r)).trim();
+      case 3: return ('TRESCIENTOS '+Decenas(r)).trim();
+      case 4: return ('CUATROCIENTOS '+Decenas(r)).trim();
+      case 5: return ('QUINIENTOS '+Decenas(r)).trim();
+      case 6: return ('SEISCIENTOS '+Decenas(r)).trim();
+      case 7: return ('SETECIENTOS '+Decenas(r)).trim();
+      case 8: return ('OCHOCIENTOS '+Decenas(r)).trim();
+      case 9: return ('NOVECIENTOS '+Decenas(r)).trim();
+      default: return Decenas(r);
+    }
+  }
+  function Seccion(num,divisor,strSing,strPlur){
+    const cientos=Math.floor(num/divisor);
+    if(cientos===0) return '';
+    if(cientos===1) return strSing;
+    return (Centenas(cientos)+' '+strPlur).trim();
+  }
+  function Miles(num){
+    const c=Math.floor(num/1000), r=num-c*1000;
+    const m=Seccion(num,1000,'MIL','MIL');
+    const cent=Centenas(r);
+    return (m+' '+cent).trim();
+  }
+  function Millones(num){
+    const c=Math.floor(num/1000000), r=num-c*1000000;
+    const mill=Seccion(num,1000000,'UN MILLON','MILLONES');
+    const miles=Miles(r);
+    return (mill+' '+miles).trim();
+  }
+  const entero=Math.floor(Math.abs(num));
+  const cent=Math.round((Math.abs(num)-entero)*100);
+  let txt = entero===0 ? 'CERO' : Millones(entero);
+  txt = txt.replace(/\s+/g,' ').trim();
+  const moneda = entero===1 ? 'PESO' : 'PESOS';
+  return `SON ${txt} ${moneda} CON ${String(cent).padStart(2,'0')}/100`;
+}
+
+/* ============================================================
+   Permisos
+   ============================================================ */
+const can = {
+  crear:  ()=> ['autorizante','admin'].includes(currentUser.rol),
+  autorizar:()=> ['autorizante','admin'].includes(currentUser.rol),
+  anular: ()=> ['autorizante','admin'].includes(currentUser.rol),
+  pagar:  ()=> ['tesoreria','admin'].includes(currentUser.rol),
+  admin:  ()=> currentUser.rol==='admin'
+};
+
+/* ============================================================
+   Arranque / Firebase
+   ============================================================ */
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    refRoot = db.ref(ROOT);
+    refUsuarios = refRoot.child('usuarios');
+    refOrdenes  = refRoot.child('ordenes');
+    refConfig   = refRoot.child('config');
+  }catch(e){
+    $('#loadingView').innerHTML = '<div class="empty"><h3>No se pudo conectar</h3><p>Revisá la configuración de Firebase en el código.</p></div>';
+    return false;
+  }
+  return true;
+}
+
+async function seedIfEmpty(){
+  const snap = await refUsuarios.get();
+  if(!snap.exists()){
+    // Usuario administrador inicial. CAMBIAR el PIN después de entrar.
+    await refUsuarios.push({ nombre:'Administrador', rol:'admin', pin:'1234' });
+  }
+  const cfg = await refConfig.get();
+  if(!cfg.exists()){
+    await refConfig.set({ numeroInicial: NUMERO_INICIAL_DEFAULT, correlativo: NUMERO_INICIAL_DEFAULT - 1 });
+  }
+}
+
+function listen(){
+  refUsuarios.on('value', s=>{ usuarios = s.val()||{}; renderLoginUsers(); if(currentUser) renderApp(); });
+  refConfig.on('value', s=>{ configData = s.val()||{}; });
+  refOrdenes.on('value', s=>{ ordenes = s.val()||{}; if(currentUser) renderList(); });
+}
+
+function isPlaceholderConfig(){
+  const k = firebaseConfig.apiKey || '';
+  return !k || k==='TU_API_KEY' || k.indexOf('TU_')===0;
+}
+function showFatal(title, detailHtml){
+  const lv=$('#loadingView');
+  lv.classList.remove('hidden');
+  lv.innerHTML = '<div class="empty" style="max-width:440px">'+
+    '<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+
+    '<h3>'+escapeHtml(title)+'</h3><p style="line-height:1.5">'+detailHtml+'</p></div>';
+  $('#loginView').classList.add('hidden');
+}
+
+async function start(){
+  if(isPlaceholderConfig()){
+    showFatal('Falta configurar Firebase',
+      'Pegá los datos de tu proyecto en el bloque <code>firebaseConfig</code> del código y creá la <b>Realtime Database</b>. Después recargá esta página.');
+    return;
+  }
+  if(!initFirebase()) return;
+
+  // detectar estado de conexión
+  try{ db.ref('.info/connected').on('value', ()=>{}); }catch(_){}
+
+  const withTimeout = (p,ms)=> Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+  try{
+    await withTimeout(seedIfEmpty(), 9000);
+    listen();
+    $('#loadingView').classList.add('hidden');
+    $('#loginView').classList.remove('hidden');
+    let saved=null;
+    try{ saved = JSON.parse(sessionStorage.getItem('op_user')||'null'); }catch(_){}
+    if(saved && usuariosTiene(saved.uid)){ currentUser = saved; enterApp(); }
+  }catch(e){
+    console.error(e);
+    const code = String(e.code||e.message||'');
+    if(e.message==='timeout'){
+      showFatal('No hay conexión con la base',
+        'No se pudieron leer los datos. Verificá que la <b>Realtime Database</b> exista y que la <code>databaseURL</code> de la config sea correcta.');
+    }else if(/permission/i.test(code)){
+      showFatal('Permiso denegado por las reglas',
+        'Las reglas de la Realtime Database bloquean el acceso. Cambialas para permitir lectura/escritura y recargá:<br><br>'+
+        '<code style="display:block;background:#eef1f4;padding:8px 10px;border-radius:6px;text-align:left">{ "rules": { ".read": true, ".write": true } }</code>');
+    }else{
+      showFatal('Error de conexión', escapeHtml(e.message||'Desconocido'));
+    }
+  }
+}
+function usuariosTiene(uid){ return usuarios && usuarios[uid]; }
+
+/* ============================================================
+   Login
+   ============================================================ */
+function renderLoginUsers(){
+  const sel = $('#loginUser');
+  const prev = sel.value;
+  sel.innerHTML='';
+  const entries = Object.entries(usuarios);
+  if(entries.length===0){
+    sel.innerHTML = '<option value="">(no hay usuarios cargados)</option>';
+  }else{
+    entries
+      .sort((a,b)=> (a[1].nombre||'').localeCompare(b[1].nombre||''))
+      .forEach(([uid,u])=>{
+        const o=el('option'); o.value=uid; o.textContent = `${u.nombre} · ${u.rol}`; sel.appendChild(o);
+      });
+    if(prev) sel.value=prev;
+  }
+}
+function doLogin(){
+  const uid = $('#loginUser').value;
+  const pin = $('#loginPin').value.trim();
+  const u = usuarios[uid];
+  const msg = $('#loginMsg');
+  if(!u){ msg.textContent='Elegí un usuario.'; return; }
+  if(String(u.pin)!==pin){ msg.textContent='PIN incorrecto.'; return; }
+  msg.textContent='';
+  currentUser = { uid, nombre:u.nombre, rol:u.rol };
+  try{ sessionStorage.setItem('op_user', JSON.stringify(currentUser)); }catch(_){}
+  enterApp();
+}
+function enterApp(){
+  $('#loginView').classList.add('hidden');
+  $('#appView').classList.remove('hidden');
+  $('#loginPin').value='';
+  renderApp();
+  renderList();
+}
+function logout(){
+  currentUser=null;
+  try{ sessionStorage.removeItem('op_user'); }catch(_){}
+  $('#appView').classList.add('hidden');
+  $('#loginView').classList.remove('hidden');
+}
+
+/* ============================================================
+   App shell
+   ============================================================ */
+function renderApp(){
+  if(!currentUser) return;
+  $('#waName').textContent = currentUser.nombre;
+  $('#waRole').textContent = currentUser.rol;
+  $('#newBtn').classList.toggle('hidden', !can.crear());
+  $('#adminBtn').classList.toggle('hidden', !can.admin());
+}
+
+const ESTADOS = [
+  {k:'todas',      label:'Todas'},
+  {k:'borrador',   label:'Borradores'},
+  {k:'autorizada', label:'Por pagar'},
+  {k:'pagada',     label:'Pagadas'},
+  {k:'anulada',    label:'Anuladas'}
+];
+function renderChips(){
+  const wrap = $('#chips'); wrap.innerHTML='';
+  const arr = Object.values(ordenes);
+  ESTADOS.forEach(e=>{
+    const n = e.k==='todas' ? arr.length : arr.filter(o=>o.estado===e.k).length;
+    const c = el('button','chip'+(filtro===e.k?' active':''));
+    c.innerHTML = `${e.label} <span class="n">${n}</span>`;
+    c.onclick = ()=>{ filtro=e.k; renderList(); };
+    wrap.appendChild(c);
+  });
+}
+
+function ordenesFiltradas(){
+  let arr = Object.entries(ordenes).map(([id,o])=>({id,...o}));
+  if(filtro!=='todas') arr = arr.filter(o=>o.estado===filtro);
+  if(busqueda){
+    const q = busqueda.toLowerCase();
+    arr = arr.filter(o =>
+      (o.beneficiario||'').toLowerCase().includes(q) ||
+      (o.concepto||'').toLowerCase().includes(q) ||
+      String(o.numero||'').includes(q)
+    );
+  }
+  // orden: por número desc (las sin número, por fecha de creación desc)
+  arr.sort((a,b)=>{
+    if(a.numero && b.numero) return b.numero - a.numero;
+    if(a.numero) return -1;
+    if(b.numero) return 1;
+    return (b.creadoEn||'').localeCompare(a.creadoEn||'');
+  });
+  return arr;
+}
+
+const TAG = {borrador:'Borrador', autorizada:'Autorizada', pagada:'Pagada', anulada:'Anulada'};
+
+function renderList(){
+  renderChips();
+  const wrap = $('#listWrap');
+  const arr = ordenesFiltradas();
+  if(arr.length===0){
+    wrap.innerHTML = `<div class="empty">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      <h3>No hay órdenes acá</h3>
+      <p>${filtro==='todas' && !busqueda ? 'Creá la primera orden de pago.' : 'Probá con otro filtro o búsqueda.'}</p>
+    </div>`;
+    return;
+  }
+  const list = el('div','list');
+  arr.forEach(o=> list.appendChild(cardOrden(o)));
+  wrap.innerHTML=''; wrap.appendChild(list);
+}
+
+function cardOrden(o){
+  const c = el('div','card');
+  const numHtml = o.numero
+    ? `<div class="num-badge"><small>N°</small>${o.numero}</div>`
+    : `<div class="num-badge" style="color:var(--muted)"><small>N°</small>—</div>`;
+
+  const meta = [];
+  meta.push('Emisión: '+fmtFecha(o.fecha||o.creadoEn));
+  if(o.autorizadoPor) meta.push('Autorizó: '+escapeHtml(nombreDe(o.autorizadoPor)));
+  if(o.pagadoEn) meta.push('Pagada: '+fmtFecha(o.pagadoEn));
+
+  c.innerHTML = `
+    ${numHtml}
+    <div class="main">
+      <div class="benef">${escapeHtml(o.beneficiario||'(sin beneficiario)')}</div>
+      <div class="concepto">${escapeHtml(o.concepto||'')}</div>
+      <div class="meta">${meta.map(m=>`<span>${m}</span>`).join('')}</div>
+    </div>
+    <div class="right">
+      <span class="tag ${o.estado}">${TAG[o.estado]}</span>
+      <div class="importe">${fmtMoneda(o.importe)}</div>
+      <div class="row-actions"></div>
+    </div>`;
+
+  const actions = c.querySelector('.row-actions');
+  actions.appendChild(btn('Ver','btn btn-sm btn-ghost',()=>verOrden(o)));
+
+  if(o.estado==='borrador' && can.crear()){
+    actions.appendChild(btn('Editar','btn btn-sm',()=>abrirForm(o)));
+    if(can.autorizar()) actions.appendChild(btn('Autorizar','btn btn-sm btn-warn',()=>autorizar(o)));
+  }
+  if(o.estado==='autorizada'){
+    if(can.pagar()) actions.appendChild(btn('Registrar pago','btn btn-sm btn-ok',()=>abrirPago(o)));
+  }
+  if((o.estado==='borrador'||o.estado==='autorizada') && can.anular()){
+    actions.appendChild(btn('Anular','btn btn-sm btn-danger',()=>anular(o)));
+  }
+  return c;
+}
+function btn(txt,cls,fn){ const b=el('button',cls,txt); b.onclick=fn; return b; }
+function nombreDe(uid){ return usuarios[uid]?.nombre || uid; }
+
+/* ============================================================
+   Modales
+   ============================================================ */
+function openModal(node){
+  const root=$('#modalRoot');
+  const ov=el('div','overlay');
+  ov.appendChild(node);
+  ov.addEventListener('mousedown',e=>{ if(e.target===ov) closeModal(); });
+  root.innerHTML=''; root.appendChild(ov);
+  document.addEventListener('keydown',escClose);
+}
+function escClose(e){ if(e.key==='Escape') closeModal(); }
+function closeModal(){ $('#modalRoot').innerHTML=''; document.removeEventListener('keydown',escClose); }
+
+/* ---- Form nueva / editar ---- */
+function abrirForm(o){
+  const editar = !!o;
+  o = o || {beneficiario:'',cuit:'',concepto:'',importe:'',formaSugerida:'',partida:'',observaciones:'',fecha:new Date().toISOString().slice(0,10)};
+  const m = el('div','modal');
+  m.innerHTML = `
+    <div class="modal-head"><h2>${editar?'Editar orden':'Nueva orden de pago'}</h2><button class="x">&times;</button></div>
+    <div class="modal-body">
+      <div class="grid2">
+        <div class="full field">
+          <label>Beneficiario (Señor/es)</label>
+          <input id="f_benef" class="ctl" value="${escapeHtml(o.beneficiario)}" placeholder="Nombre / razón social">
+        </div>
+        <div class="field">
+          <label>CUIT / DNI <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <input id="f_cuit" class="ctl" value="${escapeHtml(o.cuit)}" placeholder="00-00000000-0">
+        </div>
+        <div class="field">
+          <label>Fecha de emisión</label>
+          <input id="f_fecha" class="ctl" type="date" value="${escapeHtml(o.fecha)}">
+        </div>
+        <div class="full field">
+          <label>Concepto / detalle</label>
+          <textarea id="f_concepto" class="ctl" placeholder="En concepto de…">${escapeHtml(o.concepto)}</textarea>
+        </div>
+        <div class="field">
+          <label>Importe</label>
+          <input id="f_importe" class="ctl" type="number" step="0.01" min="0" value="${o.importe??''}" placeholder="0.00">
+          <div id="f_letras" class="letras"></div>
+        </div>
+        <div class="field">
+          <label>Forma de pago sugerida</label>
+          <select id="f_forma" class="ctl">
+            <option value="">— sin especificar —</option>
+            ${FORMAS_PAGO.map(f=>`<option ${o.formaSugerida===f?'selected':''}>${f}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Partida / imputación <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <input id="f_partida" class="ctl" value="${escapeHtml(o.partida)}" placeholder="Ej. Bienes de consumo">
+        </div>
+        <div class="full field">
+          <label>Observaciones <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <textarea id="f_obs" class="ctl">${escapeHtml(o.observaciones)}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+      <button class="btn" id="f_borr">Guardar borrador</button>
+      ${can.autorizar()?'<button class="btn btn-primary" id="f_emitir">Emitir y autorizar</button>':''}
+    </div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('[data-close]').onclick=closeModal;
+
+  const imp = m.querySelector('#f_importe');
+  const upLetras = ()=>{ const v=parseFloat(imp.value); m.querySelector('#f_letras').textContent = (v>0)?numeroALetras(v):''; };
+  imp.addEventListener('input',upLetras); upLetras();
+
+  const leer = ()=>({
+    beneficiario: m.querySelector('#f_benef').value.trim(),
+    cuit: m.querySelector('#f_cuit').value.trim(),
+    fecha: m.querySelector('#f_fecha').value,
+    concepto: m.querySelector('#f_concepto').value.trim(),
+    importe: parseFloat(m.querySelector('#f_importe').value)||0,
+    formaSugerida: m.querySelector('#f_forma').value,
+    partida: m.querySelector('#f_partida').value.trim(),
+    observaciones: m.querySelector('#f_obs').value.trim()
+  });
+  const validar = d=>{
+    if(!d.beneficiario){ toast('Falta el beneficiario', true); return false; }
+    if(!d.concepto){ toast('Falta el concepto', true); return false; }
+    if(!(d.importe>0)){ toast('El importe debe ser mayor a 0', true); return false; }
+    return true;
+  };
+
+  m.querySelector('#f_borr').onclick = async ()=>{
+    const d=leer(); if(!validar(d)) return;
+    await guardar(o, d, 'borrador'); closeModal(); toast('Borrador guardado');
+  };
+  const emitir = m.querySelector('#f_emitir');
+  if(emitir) emitir.onclick = async ()=>{
+    const d=leer(); if(!validar(d)) return;
+    await guardar(o, d, 'autorizar'); closeModal(); toast('Orden emitida y autorizada');
+  };
+}
+
+async function guardar(o, d, accion){
+  const editar = !!o.id;
+  const base = {
+    ...d,
+    estado: o.estado || 'borrador',
+    creadoPor: o.creadoPor || currentUser.uid,
+    creadoEn:  o.creadoEn  || new Date().toISOString(),
+    numero: o.numero || null,
+    modificadoEn: new Date().toISOString()
+  };
+  let id = o.id;
+  if(editar){ await refOrdenes.child(id).update(base); }
+  else { const ref = await refOrdenes.push(base); id = ref.key; }
+
+  if(accion==='autorizar'){
+    await autorizarPorId(id);
+  }
+}
+
+/* ---- Autorizar ---- */
+async function autorizar(o){
+  if(!confirm('¿Autorizar esta orden? Se le asignará número correlativo y quedará lista para pagar.')) return;
+  await autorizarPorId(o.id);
+  toast('Orden autorizada N° '+ (ordenes[o.id]?.numero||''));
+}
+async function autorizarPorId(id){
+  // transacción sobre el correlativo
+  const res = await refConfig.child('correlativo').transaction(cur=>{
+    const base = (cur==null) ? ((configData.numeroInicial||NUMERO_INICIAL_DEFAULT)-1) : cur;
+    return base + 1;
+  });
+  const numero = res.snapshot.val();
+  await refOrdenes.child(id).update({
+    estado:'autorizada',
+    numero,
+    autorizadoPor: currentUser.uid,
+    autorizadoEn: new Date().toISOString()
+  });
+}
+
+/* ---- Registrar pago ---- */
+function abrirPago(o){
+  const m = el('div','modal');
+  m.innerHTML = `
+    <div class="modal-head"><h2>Registrar pago · Orden N° ${o.numero}</h2><button class="x">&times;</button></div>
+    <div class="modal-body">
+      <p style="margin:0 0 16px;color:var(--ink-2)">
+        <strong>${escapeHtml(o.beneficiario)}</strong> — ${fmtMoneda(o.importe)}<br>
+        <span style="color:var(--muted);font-size:13.5px">${escapeHtml(o.concepto||'')}</span>
+      </p>
+      <div class="grid2">
+        <div class="field">
+          <label>Fecha de pago</label>
+          <input id="p_fecha" class="ctl" type="date" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="field">
+          <label>Forma de pago</label>
+          <select id="p_forma" class="ctl">
+            ${FORMAS_PAGO.map(f=>`<option ${o.formaSugerida===f?'selected':''}>${f}</option>`).join('')}
+          </select>
+        </div>
+        <div class="full field">
+          <label>Comprobante / N° operación <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+          <input id="p_comp" class="ctl" placeholder="N° de cheque, transferencia, recibo…">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+      <button class="btn btn-ok" id="p_ok">Confirmar pago</button>
+    </div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('[data-close]').onclick=closeModal;
+  m.querySelector('#p_ok').onclick = async ()=>{
+    await refOrdenes.child(o.id).update({
+      estado:'pagada',
+      pagadoPor: currentUser.uid,
+      pagadoEn: m.querySelector('#p_fecha').value || new Date().toISOString().slice(0,10),
+      formaPago: m.querySelector('#p_forma').value,
+      comprobante: m.querySelector('#p_comp').value.trim()
+    });
+    closeModal(); toast('Pago registrado');
+  };
+}
+
+/* ---- Anular ---- */
+async function anular(o){
+  const motivo = prompt('Motivo de la anulación:');
+  if(motivo===null) return;
+  await refOrdenes.child(o.id).update({
+    estado:'anulada',
+    anuladoPor: currentUser.uid,
+    anuladoEn: new Date().toISOString(),
+    motivoAnulacion: motivo.trim()
+  });
+  toast('Orden anulada');
+}
+
+/* ---- Ver / imprimir documento ---- */
+function verOrden(o){
+  const m = el('div','modal wide');
+  const numero = o.numero ? String(o.numero).padStart(5,'0') : '—';
+  m.innerHTML = `
+    <div class="modal-head no-print">
+      <h2>Orden de pago ${o.numero?('N° '+o.numero):'(borrador)'}</h2>
+      <button class="x">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="doc" id="docPrint">
+        <div class="doc-head">
+          <svg class="crest" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" fill="#eef1f4" stroke="#111" stroke-width="1"/><text x="12" y="15" font-size="8" font-weight="700" fill="#111" text-anchor="middle" font-family="Lora,serif">CA</text></svg>
+          <div class="org">
+            <h1>COMUNA DE ALCORTA</h1>
+            <p>Dpto. Constitución · Provincia de Santa Fe</p>
+          </div>
+          <div class="np">
+            <div class="t">ORDEN DE PAGO</div>
+            <div class="n">N° ${numero}</div>
+          </div>
+        </div>
+        <div class="place">${fmtFechaLarga(o.fecha)}</div>
+        <div class="doc-row"><div class="k">Páguese a:</div><div class="v">${escapeHtml(o.beneficiario||'')}</div></div>
+        ${o.cuit?`<div class="doc-row"><div class="k">CUIT/DNI:</div><div class="v">${escapeHtml(o.cuit)}</div></div>`:''}
+        <div class="doc-row"><div class="k">En concepto de:</div><div class="v">${escapeHtml(o.concepto||'')}</div></div>
+        ${o.partida?`<div class="doc-row"><div class="k">Imputación:</div><div class="v">${escapeHtml(o.partida)}</div></div>`:''}
+        <div class="doc-imp"><div class="k" style="font-weight:700">Importe:</div><div class="box">${fmtMoneda(o.importe)}</div></div>
+        <div class="doc-letras">${numeroALetras(o.importe||0)}.</div>
+        ${o.observaciones?`<div class="doc-row"><div class="k">Observaciones:</div><div class="v">${escapeHtml(o.observaciones)}</div></div>`:''}
+        <div class="doc-signs">
+          <div class="sign"><div class="line"></div><div class="role">Autoriza</div><div class="name">${o.autorizadoPor?escapeHtml(nombreDe(o.autorizadoPor)):'&nbsp;'}</div></div>
+          <div class="sign"><div class="line"></div><div class="role">Tesorería · Pagado</div><div class="name">${o.pagadoPor?escapeHtml(nombreDe(o.pagadoPor)):'&nbsp;'}</div></div>
+        </div>
+        <div class="doc-status-note">
+          Estado: ${TAG[o.estado].toUpperCase()}
+          ${o.autorizadoEn?` · Autorizada el ${fmtFecha(o.autorizadoEn)}`:''}
+          ${o.pagadoEn?` · Pagada el ${fmtFecha(o.pagadoEn)} (${escapeHtml(o.formaPago||'')}${o.comprobante?' · '+escapeHtml(o.comprobante):''})`:''}
+          ${o.estado==='anulada'?` · Motivo: ${escapeHtml(o.motivoAnulacion||'')}`:''}
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot no-print">
+      <button class="btn btn-ghost" data-close>Cerrar</button>
+      <button class="btn btn-primary" id="d_print">Imprimir / PDF</button>
+    </div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('[data-close]').onclick=closeModal;
+  m.querySelector('#d_print').onclick=()=>window.print();
+}
+
+/* ============================================================
+   Admin de usuarios
+   ============================================================ */
+function abrirAdmin(){
+  const m = el('div','modal wide');
+  m.innerHTML = `
+    <div class="modal-head"><h2>Usuarios y numeración</h2><button class="x">&times;</button></div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <h3 style="font-size:14px;color:var(--ink-2)">Usuarios del sistema</h3>
+        <button class="btn btn-sm btn-primary" id="u_new">+ Agregar usuario</button>
+      </div>
+      <table class="utable">
+        <thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th></th></tr></thead>
+        <tbody id="u_body"></tbody>
+      </table>
+
+      <div style="margin-top:26px;border-top:1px solid var(--line);padding-top:18px">
+        <h3 style="font-size:14px;color:var(--ink-2);margin-bottom:10px">Numeración</h3>
+        <div class="grid2">
+          <div class="field">
+            <label>Próximo número a emitir</label>
+            <input id="c_next" class="ctl" type="number" min="1" value="${(configData.correlativo||((configData.numeroInicial||NUMERO_INICIAL_DEFAULT)-1))+1}">
+            <div class="hint">Se aplica a la próxima orden que autorices. Cambialo sólo si hace falta.</div>
+          </div>
+        </div>
+        <button class="btn btn-sm" id="c_save">Guardar numeración</button>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Cerrar</button></div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('[data-close]').onclick=closeModal;
+
+  const body = m.querySelector('#u_body');
+  const pintar = ()=>{
+    body.innerHTML='';
+    Object.entries(usuarios).forEach(([uid,u])=>{
+      const tr=el('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(u.nombre)}</td>
+        <td><span class="role-pill">${escapeHtml(u.rol)}</span></td>
+        <td style="color:var(--muted)">••••</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn btn-sm btn-ghost" data-edit="${uid}">Editar</button>
+          <button class="btn btn-sm btn-danger" data-del="${uid}">Borrar</button>
+        </td>`;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>formUsuario(b.dataset.edit));
+    body.querySelectorAll('[data-del]').forEach(b=> b.onclick=async()=>{
+      if(b.dataset.del===currentUser.uid){ toast('No podés borrar tu propio usuario', true); return; }
+      if(confirm('¿Borrar este usuario?')){ await refUsuarios.child(b.dataset.del).remove(); }
+    });
+  };
+  pintar();
+  refUsuarios.on('value',pintar); // refresco en vivo mientras el modal está abierto
+
+  m.querySelector('#u_new').onclick=()=>formUsuario(null);
+  m.querySelector('#c_save').onclick=async()=>{
+    const n = parseInt(m.querySelector('#c_next').value,10);
+    if(!(n>=1)){ toast('Número inválido', true); return; }
+    await refConfig.update({ correlativo: n-1 });
+    toast('Numeración actualizada');
+  };
+}
+
+function formUsuario(uid){
+  const u = uid ? usuarios[uid] : {nombre:'',rol:'autorizante',pin:''};
+  const m = el('div','modal');
+  m.innerHTML = `
+    <div class="modal-head"><h2>${uid?'Editar usuario':'Nuevo usuario'}</h2><button class="x">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nombre y apellido</label><input id="u_nombre" class="ctl" value="${escapeHtml(u.nombre)}"></div>
+      <div class="field"><label>Rol</label>
+        <select id="u_rol" class="ctl">
+          <option value="autorizante" ${u.rol==='autorizante'?'selected':''}>Autorizante — crea, emite y autoriza</option>
+          <option value="tesoreria" ${u.rol==='tesoreria'?'selected':''}>Tesorería — ve y registra el pago</option>
+          <option value="admin" ${u.rol==='admin'?'selected':''}>Admin — todo + gestión</option>
+        </select>
+      </div>
+      <div class="field"><label>PIN</label><input id="u_pin" class="ctl" inputmode="numeric" value="${escapeHtml(u.pin)}" placeholder="4 dígitos"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-close>Cancelar</button>
+      <button class="btn btn-primary" id="u_save">Guardar</button>
+    </div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=()=>abrirAdmin();
+  m.querySelector('[data-close]').onclick=()=>abrirAdmin();
+  m.querySelector('#u_save').onclick=async()=>{
+    const d = {
+      nombre: m.querySelector('#u_nombre').value.trim(),
+      rol: m.querySelector('#u_rol').value,
+      pin: m.querySelector('#u_pin').value.trim()
+    };
+    if(!d.nombre){ toast('Falta el nombre', true); return; }
+    if(!/^\d{3,6}$/.test(d.pin)){ toast('El PIN debe ser de 3 a 6 dígitos', true); return; }
+    if(uid) await refUsuarios.child(uid).update(d);
+    else await refUsuarios.push(d);
+    toast('Usuario guardado');
+    abrirAdmin();
+  };
+}
+
+/* ============================================================
+   Eventos globales
+   ============================================================ */
+$('#loginBtn').onclick = doLogin;
+$('#loginPin').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+$('#logoutBtn').onclick = logout;
+$('#adminBtn').onclick = abrirAdmin;
+$('#newBtn').onclick = ()=>abrirForm(null);
+$('#search').addEventListener('input', e=>{ busqueda=e.target.value.trim(); renderList(); });
+
+// aviso de credenciales por defecto (sólo primer arranque)
+$('#loginFoot').textContent = 'Primer ingreso: usuario "Administrador", PIN 1234. Cambialo apenas entres.';
+
+start();
+</script>
+</body>
+</html>
