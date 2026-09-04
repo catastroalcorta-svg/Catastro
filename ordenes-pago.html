@@ -187,6 +187,27 @@
   .doc-signs .role{font-weight:700;text-transform:uppercase;letter-spacing:.5px}
   .doc-signs .name{color:#333}
   .doc-status-note{margin-top:20px;font-size:11px;color:#666;text-align:center;border-top:1px solid #ddd;padding-top:10px}
+  .doc-sheet{display:flex;flex-direction:column}
+  .copia{margin-top:5px;display:inline-block;font-weight:700;font-size:10.5px;letter-spacing:1.5px;color:#333;border:1px solid #888;padding:1px 8px;border-radius:3px}
+  .cut{display:flex;align-items:center;gap:10px;color:#aaa;font-size:11px;margin:12px 0}
+  .cut span{white-space:nowrap}
+  .cut::before,.cut::after{content:"";flex:1;border-top:1px dashed #bbb}
+
+  /* ---- Reporte diario ---- */
+  .report{color:#111}
+  .rep-head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #111;padding-bottom:12px}
+  .rep-head .crest{width:46px;height:46px;margin:0}
+  .rorg h1{font-family:'Lora',serif;font-size:19px;letter-spacing:.5px}
+  .rorg p{font-size:12px;color:#333;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+  .rep-sub{margin:14px 0 12px;font-size:13.5px}
+  .rep-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .rep-table th{background:#f2f4f6;text-align:left;padding:7px 8px;border-bottom:1.5px solid #111;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .rep-table td{padding:6px 8px;border-bottom:1px solid #ddd;vertical-align:top}
+  .rep-tot{display:flex;flex-direction:column;gap:3px;align-items:flex-end;margin-top:14px;font-size:14px}
+  .rep-tot .big{font-family:'Lora',serif;font-size:17px}
+  .rep-sign{margin-top:46px;width:230px}
+  .rep-sign .line{border-top:1px solid #111;margin-bottom:5px}
+  .rep-sign .role{font-size:12px;font-weight:700;text-transform:uppercase;text-align:center}
 
   /* ---------- Admin usuarios ---------- */
   .utable{width:100%;border-collapse:collapse;font-size:14px}
@@ -222,8 +243,21 @@
     .overlay{position:static;padding:0;background:none;overflow:visible}
     .modal,.modal.wide{max-width:none;box-shadow:none;border-radius:0}
     .modal-body{max-height:none;overflow:visible;padding:0}
-    .doc{border:none;padding:0}
-    @page{margin:16mm}
+    .doc-sheet{display:block}
+    .doc-copy{border:none;padding:14px 26px 8px;break-inside:avoid;page-break-inside:avoid}
+    .doc-copy .doc-head{padding-bottom:10px}
+    .doc-copy .doc-head .crest{width:46px;height:46px}
+    .doc-copy .doc-head .org h1{font-size:19px}
+    .doc-copy .doc-head .np .n{font-size:22px}
+    .doc-copy .place{margin:8px 0 12px}
+    .doc-copy .doc-row{margin-bottom:7px}
+    .doc-copy .doc-imp{margin:6px 0 3px}
+    .doc-copy .doc-letras{margin-bottom:14px}
+    .doc-copy .doc-signs{margin-top:30px}
+    .doc-copy .doc-status-note{margin-top:12px;padding-top:8px}
+    .cut{margin:2px 0}
+    .cut::before,.cut::after{border-top:1px dashed #999}
+    @page{size:A4;margin:11mm}
   }
 </style>
 </head>
@@ -278,6 +312,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
         <input id="search" class="ctl" placeholder="Buscar por beneficiario, concepto o N°…">
       </div>
+      <button id="dailyBtn" class="btn">Listado del día</button>
       <button id="newBtn" class="btn btn-primary hidden">+ Nueva orden</button>
     </div>
 
@@ -306,13 +341,13 @@
     reutilizar uno existente; los datos quedan bajo la rama ROOT)
    ============================================================ */
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "ordenes-pago-alcorta.firebaseapp.com",
-  databaseURL: "https://ordenes-pago-alcorta-default-rtdb.firebaseio.com",
-  projectId: "ordenes-pago-alcorta",
-  storageBucket: "ordenes-pago-alcorta.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxxxxxx"
+  apiKey: "AIzaSyCh4MNoUyHX2VqxSLTSiFGNMoNNMvDmz54",
+  authDomain: "agenda-alcorta.firebaseapp.com",
+  databaseURL: "https://agenda-alcorta-default-rtdb.firebaseio.com",
+  projectId: "agenda-alcorta",
+  storageBucket: "agenda-alcorta.firebasestorage.app",
+  messagingSenderId: "679359817910",
+  appId: "1:679359817910:web:aefcdbb449edfd379e5e17"
 };
 const ROOT = 'opAlcorta';              // rama raíz dentro de la base
 const NUMERO_INICIAL_DEFAULT = 1;      // el 1er número de orden
@@ -877,46 +912,55 @@ async function anular(o){
   toast('Orden anulada');
 }
 
-/* ---- Ver / imprimir documento ---- */
+/* ---- Ver / imprimir documento (por duplicado en una hoja) ---- */
+function docHTML(o, etiqueta){
+  const numero = o.numero ? String(o.numero).padStart(5,'0') : '—';
+  return `
+    <div class="doc-head">
+      <svg class="crest" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" fill="#eef1f4" stroke="#111" stroke-width="1"/><text x="12" y="15" font-size="8" font-weight="700" fill="#111" text-anchor="middle" font-family="Lora,serif">CA</text></svg>
+      <div class="org">
+        <h1>COMUNA DE ALCORTA</h1>
+        <p>Dpto. Constitución · Provincia de Santa Fe</p>
+      </div>
+      <div class="np">
+        <div class="t">ORDEN DE PAGO</div>
+        <div class="n">N° ${numero}</div>
+        <div class="copia">${etiqueta}</div>
+      </div>
+    </div>
+    <div class="place">${fmtFechaLarga(o.fecha)}</div>
+    <div class="doc-row"><div class="k">Páguese a:</div><div class="v">${escapeHtml(o.beneficiario||'')}</div></div>
+    ${o.cuit?`<div class="doc-row"><div class="k">CUIT/DNI:</div><div class="v">${escapeHtml(o.cuit)}</div></div>`:''}
+    <div class="doc-row"><div class="k">En concepto de:</div><div class="v">${escapeHtml(o.concepto||'')}</div></div>
+    ${o.partida?`<div class="doc-row"><div class="k">Imputación:</div><div class="v">${escapeHtml(o.partida)}</div></div>`:''}
+    <div class="doc-imp"><div class="k" style="font-weight:700">Importe:</div><div class="box">${fmtMoneda(o.importe)}</div></div>
+    <div class="doc-letras">${numeroALetras(o.importe||0)}.</div>
+    ${o.observaciones?`<div class="doc-row"><div class="k">Observaciones:</div><div class="v">${escapeHtml(o.observaciones)}</div></div>`:''}
+    <div class="doc-signs">
+      <div class="sign"><div class="line"></div><div class="role">Autoriza</div><div class="name">${o.autorizadoPor?escapeHtml(nombreDe(o.autorizadoPor)):'&nbsp;'}</div></div>
+      <div class="sign"><div class="line"></div><div class="role">Tesorería · Pagado</div><div class="name">${o.pagadoPor?escapeHtml(nombreDe(o.pagadoPor)):'&nbsp;'}</div></div>
+    </div>
+    <div class="doc-status-note">
+      Estado: ${TAG[o.estado].toUpperCase()}
+      ${o.autorizadoEn?` · Autorizada el ${fmtFecha(o.autorizadoEn)}`:''}
+      ${o.pagadoEn?` · Pagada el ${fmtFecha(o.pagadoEn)} (${escapeHtml(o.formaPago||'')}${o.comprobante?' · '+escapeHtml(o.comprobante):''})`:''}
+      ${o.estado==='anulada'?` · Motivo: ${escapeHtml(o.motivoAnulacion||'')}`:''}
+    </div>`;
+}
+
 function verOrden(o){
   const m = el('div','modal wide');
-  const numero = o.numero ? String(o.numero).padStart(5,'0') : '—';
   m.innerHTML = `
     <div class="modal-head no-print">
       <h2>Orden de pago ${o.numero?('N° '+o.numero):'(borrador)'}</h2>
       <button class="x">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="doc" id="docPrint">
-        <div class="doc-head">
-          <svg class="crest" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" fill="#eef1f4" stroke="#111" stroke-width="1"/><text x="12" y="15" font-size="8" font-weight="700" fill="#111" text-anchor="middle" font-family="Lora,serif">CA</text></svg>
-          <div class="org">
-            <h1>COMUNA DE ALCORTA</h1>
-            <p>Dpto. Constitución · Provincia de Santa Fe</p>
-          </div>
-          <div class="np">
-            <div class="t">ORDEN DE PAGO</div>
-            <div class="n">N° ${numero}</div>
-          </div>
-        </div>
-        <div class="place">${fmtFechaLarga(o.fecha)}</div>
-        <div class="doc-row"><div class="k">Páguese a:</div><div class="v">${escapeHtml(o.beneficiario||'')}</div></div>
-        ${o.cuit?`<div class="doc-row"><div class="k">CUIT/DNI:</div><div class="v">${escapeHtml(o.cuit)}</div></div>`:''}
-        <div class="doc-row"><div class="k">En concepto de:</div><div class="v">${escapeHtml(o.concepto||'')}</div></div>
-        ${o.partida?`<div class="doc-row"><div class="k">Imputación:</div><div class="v">${escapeHtml(o.partida)}</div></div>`:''}
-        <div class="doc-imp"><div class="k" style="font-weight:700">Importe:</div><div class="box">${fmtMoneda(o.importe)}</div></div>
-        <div class="doc-letras">${numeroALetras(o.importe||0)}.</div>
-        ${o.observaciones?`<div class="doc-row"><div class="k">Observaciones:</div><div class="v">${escapeHtml(o.observaciones)}</div></div>`:''}
-        <div class="doc-signs">
-          <div class="sign"><div class="line"></div><div class="role">Autoriza</div><div class="name">${o.autorizadoPor?escapeHtml(nombreDe(o.autorizadoPor)):'&nbsp;'}</div></div>
-          <div class="sign"><div class="line"></div><div class="role">Tesorería · Pagado</div><div class="name">${o.pagadoPor?escapeHtml(nombreDe(o.pagadoPor)):'&nbsp;'}</div></div>
-        </div>
-        <div class="doc-status-note">
-          Estado: ${TAG[o.estado].toUpperCase()}
-          ${o.autorizadoEn?` · Autorizada el ${fmtFecha(o.autorizadoEn)}`:''}
-          ${o.pagadoEn?` · Pagada el ${fmtFecha(o.pagadoEn)} (${escapeHtml(o.formaPago||'')}${o.comprobante?' · '+escapeHtml(o.comprobante):''})`:''}
-          ${o.estado==='anulada'?` · Motivo: ${escapeHtml(o.motivoAnulacion||'')}`:''}
-        </div>
+      <p class="no-print" style="margin:0 0 12px;font-size:12.5px;color:var(--muted)">Se imprime por duplicado en una misma hoja: <strong>Original</strong> y <strong>Duplicado</strong>, con línea de corte al medio.</p>
+      <div id="docPrint" class="doc-sheet">
+        <div class="doc doc-copy">${docHTML(o,'ORIGINAL')}</div>
+        <div class="cut"><span>✂ cortar aquí</span></div>
+        <div class="doc doc-copy">${docHTML(o,'DUPLICADO')}</div>
       </div>
     </div>
     <div class="modal-foot no-print">
@@ -927,6 +971,88 @@ function verOrden(o){
   m.querySelector('.x').onclick=closeModal;
   m.querySelector('[data-close]').onclick=closeModal;
   m.querySelector('#d_print').onclick=()=>window.print();
+}
+
+/* ============================================================
+   Listado diario imprimible
+   ============================================================ */
+function abrirListadoDiario(){
+  const hoy = new Date().toISOString().slice(0,10);
+  const m = el('div','modal wide');
+  m.innerHTML = `
+    <div class="modal-head no-print"><h2>Listado del día</h2><button class="x">&times;</button></div>
+    <div class="modal-body">
+      <div class="no-print" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px">
+        <div class="field" style="margin:0"><label>Fecha</label><input id="ld_fecha" class="ctl" type="date" value="${hoy}"></div>
+        <div class="field" style="margin:0"><label>Criterio</label>
+          <select id="ld_crit" class="ctl">
+            <option value="emision">Emitidas ese día</option>
+            <option value="pago">Pagadas ese día</option>
+          </select>
+        </div>
+      </div>
+      <div id="ld_report"></div>
+    </div>
+    <div class="modal-foot no-print">
+      <button class="btn btn-ghost" data-close>Cerrar</button>
+      <button class="btn btn-primary" id="ld_print">Imprimir / PDF</button>
+    </div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('[data-close]').onclick=closeModal;
+  const pintar=()=>{ m.querySelector('#ld_report').innerHTML = reporteDiarioHTML(m.querySelector('#ld_fecha').value, m.querySelector('#ld_crit').value); };
+  m.querySelector('#ld_fecha').addEventListener('change',pintar);
+  m.querySelector('#ld_crit').addEventListener('change',pintar);
+  m.querySelector('#ld_print').onclick=()=>window.print();
+  pintar();
+}
+
+function reporteDiarioHTML(day, criterio){
+  let arr = Object.values(ordenes).filter(o=>{
+    if(criterio==='pago') return o.estado==='pagada' && (o.pagadoEn||'').slice(0,10)===day;
+    return ['autorizada','pagada'].includes(o.estado) && (o.fecha||o.creadoEn||'').slice(0,10)===day;
+  });
+  arr.sort((a,b)=> (a.numero||0)-(b.numero||0));
+  const total = arr.reduce((s,o)=>s+(Number(o.importe)||0),0);
+  const pagadas = arr.filter(o=>o.estado==='pagada');
+  const totalPag = pagadas.reduce((s,o)=>s+(Number(o.importe)||0),0);
+
+  const dObj = new Date(day+'T00:00:00');
+  let fechaLarga = dObj.toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  fechaLarga = fechaLarga.charAt(0).toUpperCase()+fechaLarga.slice(1);
+  const critTxt = criterio==='pago' ? 'Órdenes pagadas' : 'Órdenes emitidas';
+
+  const filas = arr.map(o=>`
+    <tr>
+      <td style="text-align:center">${o.numero||'—'}</td>
+      <td>${escapeHtml(o.beneficiario||'')}</td>
+      <td>${escapeHtml(o.concepto||'')}</td>
+      <td style="text-align:center">${TAG[o.estado]}</td>
+      <td style="text-align:right;white-space:nowrap">${fmtMoneda(o.importe)}</td>
+    </tr>`).join('');
+
+  const crest = `<svg class="crest" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" fill="#eef1f4" stroke="#111" stroke-width="1"/><text x="12" y="15" font-size="8" font-weight="700" fill="#111" text-anchor="middle" font-family="Lora,serif">CA</text></svg>`;
+
+  return `
+    <div class="report">
+      <div class="rep-head">${crest}
+        <div class="rorg"><h1>COMUNA DE ALCORTA</h1><p>Órdenes de Pago — Listado diario</p></div>
+      </div>
+      <div class="rep-sub"><strong>${critTxt}</strong> · ${fechaLarga}</div>
+      ${arr.length ? `<table class="rep-table">
+        <thead><tr>
+          <th style="width:52px;text-align:center">N°</th><th>Beneficiario</th><th>Concepto</th>
+          <th style="width:96px;text-align:center">Estado</th><th style="width:120px;text-align:right">Importe</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>` : `<p style="color:#666;padding:24px 0;text-align:center">No hay órdenes para este día.</p>`}
+      <div class="rep-tot">
+        <div>Cantidad de órdenes: <strong>${arr.length}</strong></div>
+        <div class="big">Total: <strong>${fmtMoneda(total)}</strong></div>
+        ${criterio==='emision' && arr.length ? `<div style="color:#555;font-size:12.5px">De las cuales pagadas: ${pagadas.length} · ${fmtMoneda(totalPag)}</div>` : ''}
+      </div>
+      <div class="rep-sign"><div class="line"></div><div class="role">Tesorería</div></div>
+    </div>`;
 }
 
 /* ============================================================
@@ -1041,6 +1167,7 @@ $('#loginBtn').onclick = doLogin;
 $('#loginPin').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 $('#logoutBtn').onclick = logout;
 $('#adminBtn').onclick = abrirAdmin;
+$('#dailyBtn').onclick = abrirListadoDiario;
 $('#newBtn').onclick = ()=>abrirForm(null);
 $('#search').addEventListener('input', e=>{ busqueda=e.target.value.trim(); renderList(); });
 
