@@ -229,6 +229,10 @@
   @keyframes sp{to{transform:rotate(360deg)}}
 
   @media(max-width:640px){
+    .topbar{flex-wrap:wrap;gap:8px 10px}
+    .topbar .spacer{flex-basis:100%;order:1;height:0;flex-grow:0}
+    .whoami{order:2;align-items:flex-start;text-align:left;flex:1}
+    #adminBtn,#logoutBtn{order:3}
     .card{grid-template-columns:auto 1fr;gap:10px}
     .card .right{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
     .grid2{grid-template-columns:1fr}
