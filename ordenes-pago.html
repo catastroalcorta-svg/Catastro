@@ -764,7 +764,7 @@ function abrirForm(o){
           <div id="f_letras" class="letras"></div>
         </div>
         <div class="field">
-          <label>Forma de pago sugerida</label>
+          <label>Forma de pago (indicada a Tesorería)</label>
           <select id="f_forma" class="ctl">
             <option value="">— sin especificar —</option>
             ${FORMAS_PAGO.map(f=>`<option ${o.formaSugerida===f?'selected':''}>${f}</option>`).join('')}
@@ -943,6 +943,7 @@ function docHTML(o, etiqueta){
     ${o.partida?`<div class="doc-row"><div class="k">Imputación:</div><div class="v">${escapeHtml(o.partida)}</div></div>`:''}
     <div class="doc-imp"><div class="k" style="font-weight:700">Importe:</div><div class="box">${fmtMoneda(o.importe)}</div></div>
     <div class="doc-letras">${numeroALetras(o.importe||0)}.</div>
+    <div class="doc-row"><div class="k">Forma de pago:</div><div class="v"><strong>${escapeHtml(o.formaSugerida||'A definir por Tesorería')}</strong></div></div>
     ${o.observaciones?`<div class="doc-row"><div class="k">Observaciones:</div><div class="v">${escapeHtml(o.observaciones)}</div></div>`:''}
     <div class="doc-signs">
       <div class="sign"><div class="line"></div><div class="role">Autoriza</div><div class="name">${o.autorizadoPor?escapeHtml(nombreDe(o.autorizadoPor)):'&nbsp;'}</div></div>
