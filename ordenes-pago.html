@@ -492,8 +492,11 @@ function initFirebase(){
 
 async function seedIfEmpty(){
   const snap = await refUsuarios.get();
-  if(!snap.exists()){
-    // Usuario administrador inicial. CAMBIAR el PIN después de entrar.
+  const val = snap.val() || {};
+  const hayAdmin = Object.values(val).some(u=> u && u.rol==='admin');
+  if(!hayAdmin){
+    // Si no queda ningún administrador, se recrea el usuario Administrador.
+    // Usuario: Administrador · PIN: 1234 (cambialo apenas entres)
     await refUsuarios.push({ nombre:'Administrador', rol:'admin', pin:'1234' });
   }
   const cfg = await refConfig.get();
@@ -714,6 +717,7 @@ function cardOrden(o){
 }
 function btn(txt,cls,fn){ const b=el('button',cls,txt); b.onclick=fn; return b; }
 function nombreDe(uid){ return usuarios[uid]?.nombre || uid; }
+function contarAdmins(){ return Object.values(usuarios).filter(u=>u&&u.rol==='admin').length; }
 
 /* ============================================================
    Modales
@@ -1111,6 +1115,8 @@ function abrirAdmin(){
     body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>formUsuario(b.dataset.edit));
     body.querySelectorAll('[data-del]').forEach(b=> b.onclick=async()=>{
       if(b.dataset.del===currentUser.uid){ toast('No podés borrar tu propio usuario', true); return; }
+      const target = usuarios[b.dataset.del];
+      if(target && target.rol==='admin' && contarAdmins()<=1){ toast('No podés borrar el único administrador', true); return; }
       if(confirm('¿Borrar este usuario?')){ await refUsuarios.child(b.dataset.del).remove(); }
     });
   };
@@ -1157,6 +1163,8 @@ function formUsuario(uid){
     };
     if(!d.nombre){ toast('Falta el nombre', true); return; }
     if(!/^\d{3,6}$/.test(d.pin)){ toast('El PIN debe ser de 3 a 6 dígitos', true); return; }
+    const prev = uid ? usuarios[uid] : null;
+    if(prev && prev.rol==='admin' && d.rol!=='admin' && contarAdmins()<=1){ toast('Debe quedar al menos un administrador', true); return; }
     if(uid) await refUsuarios.child(uid).update(d);
     else await refUsuarios.push(d);
     toast('Usuario guardado');
