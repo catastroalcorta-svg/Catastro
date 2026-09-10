@@ -215,6 +215,16 @@
   .utable th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
   .role-pill{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--ink-2);text-transform:capitalize}
 
+  .adj-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .adj-item:last-child{border-bottom:none}
+  .adj-ic{width:36px;height:36px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.5px}
+  .adj-ic.pdf{background:#b91c1c}
+  .adj-ic.img{background:#2563eb}
+  .adj-meta{flex:1;min-width:0}
+  .adj-meta .n{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .adj-meta .s{font-size:12px;color:var(--muted)}
+  .adj-empty{color:var(--muted);text-align:center;padding:20px 0;font-size:13.5px}
+
   .toast{
     position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:60;
     background:var(--ink);color:#fff;padding:11px 18px;border-radius:var(--r-sm);
@@ -702,6 +712,7 @@ function cardOrden(o){
 
   const actions = c.querySelector('.row-actions');
   actions.appendChild(btn('Ver','btn btn-sm btn-ghost',()=>verOrden(o)));
+  actions.appendChild(btn('Facturas'+(o.adjuntosCount?` (${o.adjuntosCount})`:''),'btn btn-sm btn-ghost',()=>abrirAdjuntos(o)));
 
   if(o.estado==='borrador' && can.crear()){
     actions.appendChild(btn('Editar','btn btn-sm',()=>abrirForm(o)));
@@ -918,6 +929,117 @@ async function anular(o){
     motivoAnulacion: motivo.trim()
   });
   toast('Orden anulada');
+}
+
+/* ============================================================
+   Adjuntos (facturas PDF / fotos)
+   ============================================================ */
+function fmtTam(b){ b=Number(b)||0; if(b<1024) return b+' B'; if(b<1048576) return Math.round(b/1024)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+function fileADataURL(file){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error('read')); r.readAsDataURL(file); });
+}
+function comprimirImagen(file, maxDim=1600, quality=0.72){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file); const img=new Image();
+    img.onload=()=>{ URL.revokeObjectURL(url);
+      let w=img.width, h=img.height;
+      if(Math.max(w,h)>maxDim){ const r=maxDim/Math.max(w,h); w=Math.round(w*r); h=Math.round(h*r); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=()=>rej(new Error('img')); img.src=url;
+  });
+}
+function verAdjunto(a){
+  try{
+    const arr=a.data.split(','); const mime=(arr[0].match(/:(.*?);/)||[])[1]||a.tipo||'application/octet-stream';
+    const bstr=atob(arr[1]); let n=bstr.length; const u8=new Uint8Array(n);
+    while(n--) u8[n]=bstr.charCodeAt(n);
+    const url=URL.createObjectURL(new Blob([u8],{type:mime}));
+    window.open(url,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(e){ try{ window.open(a.data,'_blank'); }catch(_){ toast('No se pudo abrir', true); } }
+}
+async function procesarYsubir(o, file){
+  const MAX=5*1024*1024;
+  let data, tipo, nombre=(file.name||'adjunto');
+  if(file.type==='application/pdf'){
+    if(file.size>MAX){ toast('El PDF supera los 5 MB', true); throw new Error('pdf-grande'); }
+    data=await fileADataURL(file); tipo='application/pdf';
+    if(!/\.pdf$/i.test(nombre)) nombre+='.pdf';
+  } else if((file.type||'').indexOf('image/')===0){
+    data=await comprimirImagen(file); tipo='image/jpeg';
+    nombre=(nombre.replace(/\.[^.]+$/,'')||'foto')+'.jpg';
+  } else { toast('Solo PDF o imagen', true); throw new Error('formato'); }
+  const tamano=Math.round((data.length - data.indexOf(',') - 1)*0.75);
+  await refRoot.child('adjuntos').child(o.id).push({ nombre, tipo, data, tamano, subidoPor:currentUser.uid, subidoEn:new Date().toISOString() });
+  await refOrdenes.child(o.id).child('adjuntosCount').transaction(c=>(c||0)+1);
+  toast('Factura adjuntada');
+}
+async function borrarAdjunto(o, aid, refresh){
+  if(!confirm('¿Borrar este adjunto?')) return;
+  await refRoot.child('adjuntos').child(o.id).child(aid).remove();
+  await refOrdenes.child(o.id).child('adjuntosCount').transaction(c=>Math.max(0,(c||1)-1));
+  toast('Adjunto borrado');
+  if(refresh) refresh();
+}
+function abrirAdjuntos(o){
+  const m = el('div','modal');
+  m.innerHTML = `
+    <div class="modal-head"><h2>Facturas ${o.numero?('· Orden N° '+o.numero):''}</h2><button class="x">&times;</button></div>
+    <div class="modal-body">
+      <p style="margin:0 0 14px;color:var(--ink-2);font-size:13.5px"><strong>${escapeHtml(o.beneficiario||'')}</strong> — ${fmtMoneda(o.importe)}</p>
+      <div id="adj_list"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <button class="btn" id="adj_foto">Sacar foto</button>
+        <button class="btn btn-primary" id="adj_file">Subir PDF / imagen</button>
+      </div>
+      <div id="adj_msg" class="hint"></div>
+      <input id="adj_inFoto" type="file" accept="image/*" capture="environment" class="hidden">
+      <input id="adj_inFile" type="file" accept="application/pdf,image/*" class="hidden">
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Cerrar</button></div>`;
+  openModal(m);
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('[data-close]').onclick=closeModal;
+
+  const cont = m.querySelector('#adj_list');
+  const cargar = async ()=>{
+    cont.innerHTML='<div class="loader" style="min-height:70px"><div class="spin"></div></div>';
+    let val={};
+    try{ const snap=await refRoot.child('adjuntos').child(o.id).get(); val=snap.val()||{}; }
+    catch(e){ cont.innerHTML='<div class="adj-empty">No se pudo cargar.</div>'; return; }
+    const items=Object.entries(val).sort((a,b)=>(a[1].subidoEn||'').localeCompare(b[1].subidoEn||''));
+    if(items.length===0){ cont.innerHTML='<div class="adj-empty">Todavía no hay facturas adjuntas.</div>'; return; }
+    cont.innerHTML='';
+    items.forEach(([aid,a])=>{
+      const esPdf=a.tipo==='application/pdf';
+      const row=el('div','adj-item');
+      row.innerHTML=`<div class="adj-ic ${esPdf?'pdf':'img'}">${esPdf?'PDF':'IMG'}</div>
+        <div class="adj-meta"><div class="n">${escapeHtml(a.nombre||'adjunto')}</div>
+        <div class="s">${fmtTam(a.tamano)} · ${escapeHtml(nombreDe(a.subidoPor))}</div></div>`;
+      const acts=el('div','row-actions');
+      acts.appendChild(btn('Ver','btn btn-sm btn-ghost',()=>verAdjunto(a)));
+      if(can.admin() || a.subidoPor===currentUser.uid) acts.appendChild(btn('Borrar','btn btn-sm btn-danger',()=>borrarAdjunto(o,aid,cargar)));
+      row.appendChild(acts);
+      cont.appendChild(row);
+    });
+  };
+  cargar();
+
+  const inFoto=m.querySelector('#adj_inFoto'), inFile=m.querySelector('#adj_inFile'), msg=m.querySelector('#adj_msg');
+  m.querySelector('#adj_foto').onclick=()=>inFoto.click();
+  m.querySelector('#adj_file').onclick=()=>inFile.click();
+  const onPick=async(e)=>{
+    const file=e.target.files&&e.target.files[0]; e.target.value='';
+    if(!file) return;
+    msg.textContent='Procesando…';
+    try{ await procesarYsubir(o,file); await cargar(); }
+    catch(err){ console.error(err); }
+    msg.textContent='';
+  };
+  inFoto.onchange=onPick; inFile.onchange=onPick;
 }
 
 /* ---- Ver / imprimir documento (por duplicado en una hoja) ---- */
