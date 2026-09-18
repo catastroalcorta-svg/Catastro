@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v50</title>
+<title>Catastro Municipal — Alcorta v52</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1231,7 +1231,7 @@ async function importarVinculosArchivo(){
 }
 
 
-function pullFromDrive(showAlert=false){
+function pullFromDrive(showAlert=false, _retry=3){
   if(!DRIVE_API_URL||!DRIVE_TOKEN) return Promise.resolve(false);
   return new Promise(resolve=>{
     syncStatus='syncing'; updateSyncBadge();
@@ -1239,6 +1239,7 @@ function pullFromDrive(showAlert=false){
     const to=setTimeout(()=>{
       delete window[cbName];
       try{const s=document.getElementById(cbName);if(s)document.head.removeChild(s);}catch(e){}
+      if(_retry>0){ console.warn('[Drive] sin respuesta, reintentando ('+_retry+' restantes)...'); setTimeout(()=>resolve(pullFromDrive(showAlert,_retry-1)),1500); return; }
       syncStatus='error'; updateSyncBadge();
       if(showAlert) alert('No se pudo conectar con Drive.\nVerificá la conexión a internet y que el script esté publicado como \"Cualquier usuario\".');
       resolve(false);
@@ -1453,6 +1454,7 @@ function pullFromDrive(showAlert=false){
     s.onerror=()=>{
       clearTimeout(to);delete window[cbName];
       try{document.head.removeChild(s);}catch(e){}
+      if(_retry>0){ console.warn('[Drive] error de carga, reintentando ('+_retry+' restantes)...'); setTimeout(()=>resolve(pullFromDrive(showAlert,_retry-1)),1500); return; }
       syncStatus='error';updateSyncBadge();
       if(showAlert) alert('Error al cargar el script de Drive. Verificá que el Apps Script esté publicado correctamente.');
       resolve(false);
@@ -1603,7 +1605,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v50</span>
+      <span class="hdr-logo">ALCORTA v52</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -6857,6 +6859,7 @@ function rCloacaEditor(a){
       <input type="file" id="cloaca-import-file" accept=".json" style="display:none" onchange="importarConexionesArchivo(this)">
       <button class="btn btn-sm" onclick="document.getElementById('cloaca-import-file').click()" style="background:#0d9488;color:#fff;border-color:#0d9488" title="Importar el detalle de cloacas (archivo JSON) y colocar/vincular las conexiones automáticamente">📥 Importar detalle</button>
       <button class="btn btn-sm" onclick="exportarGeoCloacasEditor()" style="background:#0d6efd;color:#fff;border-color:#0d6efd">⬇ Exportar GeoJSON</button>
+      <button class="btn btn-sm" onclick="togglePlanoCloacas()" style="background:#7c3aed;color:#fff;border-color:#7c3aed" title="Mostrar el plano de cañería como fondo para calcar y verificar">🗺️ Plano cañería</button>
       <button class="btn btn-sm" onclick="goList()">← Volver</button>
     </div>
   </div>
@@ -6887,6 +6890,29 @@ function rCloacaEditor(a){
       </div>
       <div id="cloaca-editor-hint" style="display:none;font-size:12px;background:#dbeafe;border:1px solid #93c5fd;border-radius:6px;padding:7px 10px;margin-bottom:6px;color:#1e40af"></div>
       <div id="cloaca-editor-map" style="height:520px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden"></div>
+      <div id="plano-cfg-panel" style="display:none;margin-top:8px;padding:10px;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;font-size:12px">
+        <div style="font-weight:700;color:#6d28d9;margin-bottom:6px">🗺️ Alinear plano de cañería <span id="plano-cfg-status" style="font-weight:400;color:#16a34a;margin-left:8px"></span></div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+          <label style="display:flex;align-items:center;gap:5px">Transparencia <input type="range" min="0.1" max="1" step="0.05" value="0.6" oninput="_planoOpacity(this.value)"></label>
+          <div>Mover:
+            <button class="btn btn-sm" onclick="_planoNudge(0.00025,0)">↑</button>
+            <button class="btn btn-sm" onclick="_planoNudge(-0.00025,0)">↓</button>
+            <button class="btn btn-sm" onclick="_planoNudge(0,-0.00025)">←</button>
+            <button class="btn btn-sm" onclick="_planoNudge(0,0.00025)">→</button>
+          </div>
+          <div>Tamaño:
+            <button class="btn btn-sm" onclick="_planoScale(1.03)">➕</button>
+            <button class="btn btn-sm" onclick="_planoScale(0.97)">➖</button>
+          </div>
+          <div>Rotar:
+            <button class="btn btn-sm" onclick="_planoRotar(-0.5)">↺</button>
+            <span id="plano-rot-lbl">0°</span>
+            <button class="btn btn-sm" onclick="_planoRotar(0.5)">↻</button>
+          </div>
+          <button class="btn btn-sm" onclick="_planoSaveCfg()" style="background:#16a34a;color:#fff;border-color:#16a34a">💾 Guardar posición</button>
+          <button class="btn btn-sm" onclick="togglePlanoCloacas()">✕ Ocultar</button>
+        </div>
+      </div>
       <div style="font-size:10px;color:var(--text3);margin-top:4px">🟩 Colectores · 🔵 Cámaras · 🟠 Conexiones · Click en un elemento para ver propiedades o eliminarlo.</div>
     </div>
     <div>
@@ -6987,6 +7013,61 @@ function initCloacaEditorMap(){
   cloacaEditorMap.on('click',cloacaEditorOnClick);
   cloacaEditorMap.on('dblclick',cloacaEditorOnDblClick);
   cloacaEditorMap.on('mousemove',cloacaEditorOnMouseMove);
+}
+
+// ===== Plano de cañería: imagen de fondo para calcar/verificar =====
+let _planoOverlay=null, _planoRot=0, _planoVisible=false;
+function _planoBoundsDefault(){
+  try{ if(geoData&&geoData.features&&geoData.features.length){ const b=L.geoJSON(geoData).getBounds(); return [[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]; } }catch(e){}
+  return [[-33.560,-61.140],[-33.530,-61.105]];
+}
+function _planoLoadCfg(){
+  try{ const s=localStorage.getItem('catastro_plano_cloacas_cfg'); if(s){ const c=JSON.parse(s); _planoRot=c.rot||0; return c.bounds; } }catch(e){}
+  _planoRot=0; return null;
+}
+function _reapplyPlanoRot(){
+  if(!_planoOverlay)return; const el=_planoOverlay.getElement(); if(!el)return;
+  el.style.transformOrigin='50% 50%';
+  const base=el.style.transform.replace(/\s*rotate\([^)]*\)/,'');
+  el.style.transform=base+' rotate('+_planoRot+'deg)';
+}
+function togglePlanoCloacas(){
+  if(!cloacaEditorMap){alert('Abrí el editor de cloacas primero.');return;}
+  const panel=document.getElementById('plano-cfg-panel');
+  if(_planoVisible){
+    if(_planoOverlay){try{cloacaEditorMap.removeLayer(_planoOverlay);}catch(e){}_planoOverlay=null;}
+    try{cloacaEditorMap.off('zoomend moveend',_reapplyPlanoRot);}catch(e){}
+    _planoVisible=false; if(panel)panel.style.display='none';
+    return;
+  }
+  const bounds=_planoLoadCfg()||_planoBoundsDefault();
+  _planoOverlay=L.imageOverlay('plano_cloacas.jpg', bounds, {opacity:0.6, interactive:false}).addTo(cloacaEditorMap);
+  _planoOverlay.on('load', _reapplyPlanoRot);
+  _planoOverlay.on('error', ()=>{ alert('No encuentro el archivo "plano_cloacas.jpg". Tenés que subirlo al repositorio de GitHub, junto al index.html.'); });
+  cloacaEditorMap.on('zoomend moveend', _reapplyPlanoRot);
+  _planoVisible=true;
+  if(panel)panel.style.display='block';
+  const lbl=document.getElementById('plano-rot-lbl'); if(lbl)lbl.textContent=_planoRot+'°';
+  try{cloacaEditorMap.fitBounds(bounds,{padding:[10,10]});}catch(e){}
+  setTimeout(_reapplyPlanoRot,200);
+}
+function _planoNudge(dLat,dLng){
+  if(!_planoOverlay)return; const b=_planoOverlay.getBounds();
+  _planoOverlay.setBounds([[b.getSouth()+dLat,b.getWest()+dLng],[b.getNorth()+dLat,b.getEast()+dLng]]); _reapplyPlanoRot();
+}
+function _planoScale(f){
+  if(!_planoOverlay)return; const b=_planoOverlay.getBounds();
+  const cLat=(b.getSouth()+b.getNorth())/2, cLng=(b.getWest()+b.getEast())/2;
+  const hLat=(b.getNorth()-b.getSouth())/2*f, hLng=(b.getEast()-b.getWest())/2*f;
+  _planoOverlay.setBounds([[cLat-hLat,cLng-hLng],[cLat+hLat,cLng+hLng]]); _reapplyPlanoRot();
+}
+function _planoOpacity(v){ if(_planoOverlay)_planoOverlay.setOpacity(parseFloat(v)); }
+function _planoRotar(d){ _planoRot=Math.round((_planoRot+d)*10)/10; _reapplyPlanoRot(); const l=document.getElementById('plano-rot-lbl'); if(l)l.textContent=_planoRot+'°'; }
+function _planoSaveCfg(){
+  if(!_planoOverlay)return; const b=_planoOverlay.getBounds();
+  const cfg={bounds:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]], rot:_planoRot};
+  try{localStorage.setItem('catastro_plano_cloacas_cfg',JSON.stringify(cfg));}catch(e){}
+  const st=document.getElementById('plano-cfg-status'); if(st){st.textContent='✅ Posición guardada';setTimeout(()=>{if(st)st.textContent='';},2500);}
 }
 
 function cloacaEditorRedibujarRed(){
@@ -8197,7 +8278,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v50)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v52)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
