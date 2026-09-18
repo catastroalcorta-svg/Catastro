@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v52</title>
+<title>Catastro Municipal — Alcorta v53</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1605,7 +1605,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v52</span>
+      <span class="hdr-logo">ALCORTA v53</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -1852,7 +1852,9 @@ function rAjustes(a){if(!puedoVer('ajustes')){goList();return;}
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <input type="file" id="cloaca-file" accept=".json" style="width:auto;flex:1;min-width:200px;margin:0">
       <button class="btn btn-primary" style="background:var(--green);border-color:var(--green)" onclick="doImportCloacas()">Importar cloacas</button>
+      <button class="btn btn-primary" style="background:#c2410c;border-color:#c2410c" onclick="doReemplazarCloacas()" title="Deja el estado EXACTO al archivo: marca las de la lista y desmarca el resto">🔄 Reemplazar todo</button>
     </div>
+    <p style="font-size:11px;color:var(--text3);margin-top:6px">🔄 <b>Reemplazar todo</b>: usa este con el archivo <b>cloacas_actualizar.json</b> para dejar el estado idéntico al Excel (marca las que están y <b>desmarca las que ya no</b>).</p>
     <div class="progress-bar" id="imp-bar-c"><div class="progress-fill" id="imp-fill-c" style="width:0%"></div></div>
     <div id="imp-status-c" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
   </div>
@@ -2142,6 +2144,39 @@ async function doImport(){
   st.textContent=msg;
   filter();
   setTimeout(()=>{bar.style.display='none';fill.style.width='0%';},4000);
+}
+
+async function doReemplazarCloacas(){
+  const f=document.getElementById('cloaca-file');
+  if(!f||!f.files||!f.files[0]){alert('Elegí primero el archivo cloacas_actualizar.json (con el botón de examinar).');return;}
+  const st=document.getElementById('imp-status-c');
+  let data;
+  try{ data=JSON.parse(await f.files[0].text()); }catch(e){ alert('Archivo JSON inválido.'); return; }
+  if(!Array.isArray(data)){ alert('El JSON debe ser un array.'); return; }
+  if(!confirm('Esto deja el estado de cloacas EXACTO al archivo:\n\n• Marca las '+data.length+' parcelas de la lista como "Con cloaca".\n• DESMARCA todas las demás.\n\n¿Continuar?'))return;
+  if(st)st.textContent='Reemplazando...';
+  await new Promise(r=>setTimeout(r,30));
+  // 1) desmarcar todo
+  let antes=0;
+  records.forEach(r=>{ if(r.tieneCloaca)antes++; r.tieneCloaca=false; });
+  // 2) índices por ctaTasa / padrón / cuim
+  const byCta={}, byPad={}, byCuim={};
+  records.forEach((r,i)=>{ const c=String(r.ctaTasa||'').trim(); if(c&&byCta[c]==null)byCta[c]=i; const p=String(r.padron||'').trim(); if(p&&byPad[p]==null)byPad[p]=i; const u=String(r.cuim||'').trim(); if(u&&byCuim[u]==null)byCuim[u]=i; });
+  let marcadas=0, noEnc=0;
+  data.forEach(c=>{
+    const cta=String(c.ctaTasa||'').trim(), pad=String(c.padron||'').trim(), cuim=String(c.cuim||'').trim();
+    let idx=-1;
+    if(cta&&byCta[cta]!=null) idx=byCta[cta];
+    if(idx<0&&pad&&byPad[pad]!=null) idx=byPad[pad];
+    if(idx<0&&cuim&&byCuim[cuim]!=null) idx=byCuim[cuim];
+    if(idx>=0){ records[idx].tieneCloaca=true; if(c.estado)records[idx].estadoCloaca=c.estado; if(c.nroCloaca)records[idx].nroCloaca=String(c.nroCloaca); marcadas++; }
+    else noEnc++;
+  });
+  saveData();
+  if(DRIVE_API_URL&&DRIVE_TOKEN) pushToDrive(true);
+  filter();
+  if(st)st.textContent='✅ Listo. Con cloaca: '+records.filter(r=>r.tieneCloaca).length+' · Marcadas: '+marcadas+' · No encontradas: '+noEnc;
+  alert('✅ Cloacas actualizadas al Excel.\n\nCon cloaca ahora: '+records.filter(r=>r.tieneCloaca).length+'\nMarcadas desde el archivo: '+marcadas+'\nNo encontradas en el padrón: '+noEnc+'\n(Antes había '+antes+' marcadas.)');
 }
 
 async function doImportCloacas(){
@@ -8040,7 +8075,7 @@ function rDetail(a){
         ${r.calle?`<div class="detail-sub">${esc(r.calle)} ${esc(r.numero||'')}</div>`:''}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <span class="tag ${r.tieneCloaca?'tag-green':'tag-gray'}">${r.tieneCloaca?'Con cloaca':'Sin cloaca'}</span>
+        <span class="tag ${r.tieneCloaca?(r.estadoCloaca&&r.estadoCloaca!=='NORMAL'?'tag-blue':'tag-green'):'tag-gray'}" style="font-size:13px;font-weight:700;padding:5px 12px">${r.tieneCloaca?('✅ CON CLOACA'+(r.estadoCloaca&&r.estadoCloaca!=='NORMAL'?' ('+esc(r.estadoCloaca)+')':'')):'⚠️ SIN CLOACA'}</span>
         ${r.tipoInmueble?`<span class="tag tag-blue">${esc(r.tipoInmueble)}</span>`:''}
         ${r.estadoTerreno?`<span class="tag ${r.estadoTerreno==='Baldío'?'tag-gray':r.estadoTerreno==='Edificado'?'tag-green':'tag-blue'}">${esc(r.estadoTerreno)}</span>`:''}
       </div>
@@ -8278,7 +8313,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v52)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v53)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
