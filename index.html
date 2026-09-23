@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catastro Municipal — Alcorta v53</title>
+<title>Catastro Municipal — Alcorta v54</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <style>
@@ -1605,7 +1605,7 @@ function hdr(){
   const lsWarning=lsKB>7000?`<span id="ls-warning-badge" onclick="goAjustes()" title="Almacenamiento local casi lleno (${lsKB.toLocaleString('es')} KB). Clic para ir a Ajustes y liberar espacio." style="font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.25);color:#fca5a5;cursor:pointer;display:inline-flex;align-items:center;gap:4px">⚠️ Almac. lleno</span>`:`<span id="ls-warning-badge" style="display:none"></span>`;
   return `<div class="hdr">
     <div class="hdr-left">
-      <span class="hdr-logo">ALCORTA v53</span>
+      <span class="hdr-logo">ALCORTA v54</span>
       <div class="hdr-sep"></div>
       <span class="hdr-title">Sistema de Catastro Municipal</span>
       ${syncBadge}
@@ -6177,6 +6177,7 @@ function printFicha(){
           ${fila('Nombre', fv(r.titular))}
           ${fila('DNI', fv(r.dni))}
           ${fila('Teléfono', fv(r.telefono))}
+          ${fila('Email', fv(r.email))}
         </table>
       </div>
       ${r.tieneCloaca?`<div class="section">
@@ -6212,6 +6213,20 @@ function printFicha(){
       </div>`:''}
     </div>
   </div>
+  <!-- DATOS DE ESCRITURA / TÍTULO -->
+  ${r.titulos&&Object.values(r.titulos).some(v=>v)?`<div class="section">
+    <div class="section-title">Datos de escritura / Título</div>
+    <table>
+      ${fila('N° Escritura', fv(r.titulos.escritura))}
+      ${fila('Escribano', fv(r.titulos.escribano))}
+      ${fila('N° Registro', fv(r.titulos.registro))}
+      ${fila('Fecha', fv(r.titulos.fecha))}
+      ${fila('Juzgado', fv(r.titulos.juzgado))}
+      ${fila('Avalúo', fv(r.titulos.avaluo))}
+      ${fila('N° Inscripción Registro de Propiedades', fv(r.titulos.inscripcion))}
+      ${fila('Descripción', fv(r.titulos.descripcion))}
+    </table>
+  </div>`:''}
   <!-- FOOTER -->
   <div class="footer">
     <div>
@@ -8313,7 +8328,7 @@ function buildMapHTML(){
       <button class="btn btn-sm" onclick="diagnosticarMapa()" style="background:#374151;color:#fff;border-color:#374151;font-size:11px">🔧 Diagnóstico</button>
     </div>
     <div id="draw-hint" style="display:none;font-size:12px;background:#f0e6f8;border:1px solid #c9a8e0;border-radius:6px;padding:8px 10px;margin-top:6px">
-      ✏️ <b>Modo dibujo activo (v53)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
+      ✏️ <b>Modo dibujo activo (v54)</b> — Tocá cada vértice en el mapa. Cuando termines, tocá <b>Cerrar polígono</b>.
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="finalizarDraw()" style="background:#16a34a;color:#fff;border-color:#16a34a">✅ Cerrar polígono</button>
         <button class="btn btn-sm" onclick="cancelarDraw()">Cancelar</button>
