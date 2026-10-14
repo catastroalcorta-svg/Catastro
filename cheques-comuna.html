@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Cheques · Comuna de Alcorta</title>
+<style>
+:root{
+  --bg:#f4f6f9; --card:#fff; --tx:#1d2733; --mut:#6b7785; --bd:#dde3ea;
+  --pri:#1f5f8b; --pri2:#174a6d; --ok:#2e8b57; --warn:#d98b00; --bad:#c0392b; --gray:#8a94a0;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:var(--pri);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:1.2rem}
+header small{opacity:.85}
+.wrap{max-width:1150px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:1.05rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+label{display:block;font-size:.8rem;color:var(--mut);margin-bottom:3px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radius:6px;font:inherit;background:#fff}
+input:focus,select:focus{outline:2px solid #9cc3e0;border-color:var(--pri)}
+.btn{border:0;border-radius:6px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--pri);color:#fff}
+.btn:hover{background:var(--pri2)}
+.btn.sec{background:#e8edf3;color:var(--tx)} .btn.sec:hover{background:#d8e0ea}
+.btn.sm{padding:5px 9px;font-size:.8rem}
+.btn.ok{background:var(--ok)} .btn.bad{background:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;border-left:5px solid var(--pri)}
+.stat b{display:block;font-size:1.25rem;margin-top:4px}
+.stat span{font-size:.8rem;color:var(--mut)}
+.stat.w{border-left-color:var(--warn)} .stat.r{border-left-color:var(--bad)} .stat.g{border-left-color:var(--ok)}
+#alertas{display:none}
+.alerta{background:#fff7e6;border:1px solid #f0c36d;border-left:5px solid var(--warn);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.alerta.venc{background:#fdecea;border-color:#e6a39b;border-left-color:var(--bad)}
+.tbl{width:100%;border-collapse:collapse;font-size:.9rem}
+.tbl th{text-align:left;background:#eef2f6;padding:8px;border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none}
+.tbl td{padding:8px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.tbl tr:hover td{background:#f8fafc}
+.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600;color:#fff;white-space:nowrap}
+.t-pend{background:var(--pri)} .t-prox{background:var(--warn)} .t-venc{background:var(--bad)}
+.t-cob{background:var(--ok)} .t-anu{background:var(--gray)}
+.scroll{overflow-x:auto}
+.empty{text-align:center;color:var(--mut);padding:24px}
+.acc{display:flex;gap:4px;flex-wrap:nowrap}
+.muted{color:var(--mut);font-size:.8rem}
+dialog{border:0;border-radius:10px;padding:0;max-width:560px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog .card{margin:0;border:0}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1d2733;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:99}
+@media print{
+  header .row,.no-print,#alertas,.acc{display:none!important}
+  body{background:#fff} .card,.stat{border:1px solid #999}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Control de Cheques Emitidos</h1>
+    <small>Comuna de Alcorta</small>
+  </div>
+  <div class="row no-print">
+    <button class="btn sec sm" id="btnNotif">🔔 Activar avisos</button>
+    <button class="btn sec sm" onclick="exportarCSV()">Exportar Excel (CSV)</button>
+    <button class="btn sec sm" onclick="exportarJSON()">Respaldo</button>
+    <button class="btn sec sm" onclick="document.getElementById('fileImp').click()">Restaurar</button>
+    <button class="btn sec sm" onclick="window.print()">Imprimir</button>
+    <input type="file" id="fileImp" accept=".json" hidden>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div id="alertas" class="card">
+    <h2>⚠️ Recordatorios de vencimiento</h2>
+    <div id="listaAlertas"></div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card no-print">
+    <h2 id="tituloForm">Registrar cheque</h2>
+    <form id="form" autocomplete="off">
+      <input type="hidden" id="fId">
+      <div class="grid">
+        <div><label>N° de cheque</label><input id="fNumero" placeholder="Ej: 00012345"></div>
+        <div><label>Banco / Cuenta</label><input id="fBanco" list="bancos" placeholder="Ej: Banco Santa Fe"></div>
+        <div><label>Fecha de emisión *</label><input type="date" id="fEmision" required></div>
+        <div><label>Fecha de vencimiento (pago) *</label><input type="date" id="fVenc" required></div>
+        <div><label>Beneficiario (a quién se le da) *</label><input id="fBenef" list="benefs" required placeholder="Nombre o razón social"></div>
+        <div><label>Importe ($) *</label><input id="fImporte" required inputmode="decimal" placeholder="0,00"></div>
+        <div style="grid-column:1/-1"><label>Concepto / Observaciones</label><input id="fConcepto" placeholder="Ej: Pago proveedor de combustible, OP N° 123"></div>
+      </div>
+      <datalist id="bancos"></datalist><datalist id="benefs"></datalist>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" type="submit" id="btnGuardar">Guardar cheque</button>
+        <button class="btn sec" type="button" id="btnCancelar" style="display:none" onclick="limpiarForm()">Cancelar edición</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="row no-print" style="margin-bottom:12px">
+      <div style="flex:2;min-width:180px"><label>Buscar</label><input id="qTexto" placeholder="Beneficiario, N°, concepto..."></div>
+      <div style="flex:1;min-width:140px"><label>Estado</label>
+        <select id="qEstado">
+          <option value="activos">Pendientes (todos)</option>
+          <option value="prox">Vencen en 3 días</option>
+          <option value="venc">Vencidos sin cobrar</option>
+          <option value="cobrado">Cobrados</option>
+          <option value="anulado">Anulados</option>
+          <option value="todos">Todos</option>
+        </select>
+      </div>
+      <div style="flex:1;min-width:130px"><label>Vence desde</label><input type="date" id="qDesde"></div>
+      <div style="flex:1;min-width:130px"><label>Vence hasta</label><input type="date" id="qHasta"></div>
+      <button class="btn sec" onclick="limpiarFiltros()">Limpiar</button>
+    </div>
+    <div class="scroll">
+      <table class="tbl">
+        <thead><tr>
+          <th data-k="numero">N°</th>
+          <th data-k="emision">Emisión</th>
+          <th data-k="venc">Vencimiento ▲</th>
+          <th data-k="benef">Beneficiario</th>
+          <th data-k="concepto">Concepto</th>
+          <th data-k="importe" class="num">Importe</th>
+          <th>Estado</th>
+          <th class="no-print">Acciones</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+        <tfoot><tr><td colspan="5" style="text-align:right;font-weight:600">Total listado:</td><td class="num" id="totalLista" style="font-weight:700"></td><td colspan="2"></td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <p class="muted no-print">Los datos se guardan en este navegador. Hacé un <b>Respaldo</b> periódicamente. Los avisos aparecen al abrir la página y, si activás 🔔, como notificación mientras esté abierta.</p>
+</div>
+
+<dialog id="dlgCobro">
+  <div class="card">
+    <h2>Marcar como cobrado</h2>
+    <p id="dlgTxt" class="muted"></p>
+    <label>Fecha en que se debitó / cobró</label>
+    <input type="date" id="dlgFecha">
+    <div class="row" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn sec" onclick="dlgCobro.close()">Cancelar</button>
+      <button class="btn ok" onclick="confirmarCobro()">Confirmar</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+const KEY = 'cheques_comuna_alcorta_v1';
+const DIAS_AVISO = 3;
+let cheques = [];
+let orden = { k: 'venc', asc: true };
+let idCobro = null;
+
+const $ = id => document.getElementById(id);
+const fmt$ = n => '$ ' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtF = s => s ? s.split('-').reverse().join('/') : '';
+const hoyISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function diasHasta(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const v = new Date(y, m - 1, d);
+  const h = new Date(); h.setHours(0, 0, 0, 0);
+  return Math.round((v - h) / 86400000);
+}
+
+function parseImporte(txt) {
+  let s = String(txt).trim().replace(/\$|\s/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : Math.round(n * 100) / 100;
+}
+
+function cargar() {
+  try { cheques = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { cheques = []; }
+}
+function guardar() {
+  try { localStorage.setItem(KEY, JSON.stringify(cheques)); }
+  catch (e) { alert('No se pudo guardar en el navegador. Exportá un respaldo.'); }
+}
+
+function situacion(c) {
+  if (c.estado === 'cobrado') return { k: 'cobrado', txt: 'Cobrado', cls: 't-cob' };
+  if (c.estado === 'anulado') return { k: 'anulado', txt: 'Anulado', cls: 't-anu' };
+  const d = diasHasta(c.venc);
+  if (d < 0) return { k: 'venc', txt: `Vencido (${-d} d)`, cls: 't-venc', d };
+  if (d <= DIAS_AVISO) return { k: 'prox', txt: d === 0 ? 'Vence HOY' : d === 1 ? 'Vence mañana' : `Vence en ${d} días`, cls: 't-prox', d };
+  return { k: 'pend', txt: 'Pendiente', cls: 't-pend', d };
+}
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2500);
+}
+
+/* ---------- Formulario ---------- */
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  const imp = parseImporte($('fImporte').value);
+  if (imp === null || imp <= 0) { alert('Ingresá un importe válido.'); $('fImporte').focus(); return; }
+  if ($('fVenc').value < $('fEmision').value) {
+    if (!confirm('La fecha de vencimiento es anterior a la de emisión. ¿Guardar igual?')) return;
+  }
+  const datos = {
+    numero: $('fNumero').value.trim(),
+    banco: $('fBanco').value.trim(),
+    emision: $('fEmision').value,
+    venc: $('fVenc').value,
+    benef: $('fBenef').value.trim(),
+    importe: imp,
+    concepto: $('fConcepto').value.trim()
+  };
+  const id = $('fId').value;
+  if (id) {
+    Object.assign(cheques.find(c => c.id === id), datos);
+    toast('Cheque actualizado');
+  } else {
+    if (datos.numero && cheques.some(c => c.numero === datos.numero && c.banco === datos.banco)) {
+      if (!confirm('Ya existe un cheque con ese número y banco. ¿Guardar igual?')) return;
+    }
+    cheques.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), estado: 'pendiente', creado: new Date().toISOString(), ...datos });
+    toast('Cheque registrado');
+  }
+  guardar(); limpiarForm(); render();
+});
+
+function limpiarForm() {
+  $('form').reset(); $('fId').value = '';
+  $('fEmision').value = hoyISO();
+  $('tituloForm').textContent = 'Registrar cheque';
+  $('btnGuardar').textContent = 'Guardar cheque';
+  $('btnCancelar').style.display = 'none';
+}
+
+function editar(id) {
+  const c = cheques.find(x => x.id === id); if (!c) return;
+  $('fId').value = c.id; $('fNumero').value = c.numero; $('fBanco').value = c.banco;
+  $('fEmision').value = c.emision; $('fVenc').value = c.venc; $('fBenef').value = c.benef;
+  $('fImporte').value = c.importe.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+  $('fConcepto').value = c.concepto;
+  $('tituloForm').textContent = 'Editar cheque';
+  $('btnGuardar').textContent = 'Guardar cambios';
+  $('btnCancelar').style.display = '';
+  window.scrollTo({ top: $('form').offsetTop - 80, behavior: 'smooth' });
+}
+
+function abrirCobro(id) {
+  const c = cheques.find(x => x.id === id); idCobro = id;
+  $('dlgTxt').textContent = `${c.benef} — ${fmt$(c.importe)} — vence ${fmtF(c.venc)}`;
+  $('dlgFecha').value = hoyISO();
+  $('dlgCobro').showModal();
+}
+function confirmarCobro() {
+  const c = cheques.find(x => x.id === idCobro);
+  c.estado = 'cobrado'; c.fechaCobro = $('dlgFecha').value;
+  guardar(); $('dlgCobro').close(); render(); toast('Marcado como cobrado');
+}
+function anular(id) {
+  const c = cheques.find(x => x.id === id);
+  if (!confirm(`¿Anular el cheque de ${c.benef} por ${fmt$(c.importe)}?`)) return;
+  c.estado = 'anulado'; c.fechaAnulado = hoyISO(); guardar(); render();
+}
+function reactivar(id) {
+  const c = cheques.find(x => x.id === id);
+  c.estado = 'pendiente'; delete c.fechaCobro; delete c.fechaAnulado; guardar(); render();
+}
+function eliminar(id) {
+  const c = cheques.find(x => x.id === id);
+  if (!confirm(`¿ELIMINAR definitivamente el cheque de ${c.benef}? (Si fue un error de carga. Para cheques inválidos usá "Anular")`)) return;
+  cheques = cheques.filter(x => x.id !== id); guardar(); render();
+}
+
+/* ---------- Filtros y orden ---------- */
+['qTexto', 'qEstado', 'qDesde', 'qHasta'].forEach(id => $(id).addEventListener('input', renderTabla));
+function limpiarFiltros() { $('qTexto').value = ''; $('qEstado').value = 'activos'; $('qDesde').value = ''; $('qHasta').value = ''; renderTabla(); }
+
+document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  orden = { k, asc: orden.k === k ? !orden.asc : true };
+  document.querySelectorAll('th[data-k]').forEach(t => t.textContent = t.textContent.replace(/ [▲▼]$/, ''));
+  th.textContent += orden.asc ? ' ▲' : ' ▼';
+  renderTabla();
+}));
+
+function filtrados() {
+  const q = $('qTexto').value.toLowerCase().trim();
+  const est = $('qEstado').value, desde = $('qDesde').value, hasta = $('qHasta').value;
+  return cheques.filter(c => {
+    const s = situacion(c).k;
+    if (est === 'activos' && !['pend', 'prox', 'venc'].includes(s)) return false;
+    if (est === 'prox' && s !== 'prox') return false;
+    if (est === 'venc' && s !== 'venc') return false;
+    if (est === 'cobrado' && s !== 'cobrado') return false;
+    if (est === 'anulado' && s !== 'anulado') return false;
+    if (desde && c.venc < desde) return false;
+    if (hasta && c.venc > hasta) return false;
+    if (q && !`${c.benef} ${c.numero} ${c.concepto} ${c.banco}`.toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => {
+    let va = a[orden.k] ?? '', vb = b[orden.k] ?? '';
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = String(vb).toLowerCase(); }
+    return (va < vb ? -1 : va > vb ? 1 : 0) * (orden.asc ? 1 : -1);
+  });
+}
+
+/* ---------- Render ---------- */
+function render() { renderStats(); renderAlertas(); renderTabla(); renderListas(); }
+
+function renderStats() {
+  const pend = cheques.filter(c => c.estado === 'pendiente');
+  const prox = pend.filter(c => situacion(c).k === 'prox');
+  const venc = pend.filter(c => situacion(c).k === 'venc');
+  const mes = hoyISO().slice(0, 7);
+  const delMes = cheques.filter(c => c.estado !== 'anulado' && c.emision.slice(0, 7) === mes);
+  const sum = a => a.reduce((s, c) => s + c.importe, 0);
+  $('stats').innerHTML = `
+    <div class="stat"><span>Pendientes de cobro</span><b>${fmt$(sum(pend))}</b><span>${pend.length} cheque(s)</span></div>
+    <div class="stat w"><span>Vencen en ${DIAS_AVISO} días</span><b>${fmt$(sum(prox))}</b><span>${prox.length} cheque(s)</span></div>
+    <div class="stat r"><span>Vencidos sin cobrar</span><b>${fmt$(sum(venc))}</b><span>${venc.length} cheque(s)</span></div>
+    <div class="stat g"><span>Emitidos este mes</span><b>${fmt$(sum(delMes))}</b><span>${delMes.length} cheque(s)</span></div>`;
+}
+
+function alertasActuales() {
+  return cheques.filter(c => c.estado === 'pendiente' && ['prox', 'venc'].includes(situacion(c).k))
+    .sort((a, b) => a.venc.localeCompare(b.venc));
+}
+
+function renderAlertas() {
+  const al = alertasActuales();
+  $('alertas').style.display = al.length ? 'block' : 'none';
+  $('listaAlertas').innerHTML = al.map(c => {
+    const s = situacion(c);
+    return `<div class="alerta ${s.k === 'venc' ? 'venc' : ''}">
+      <b>${esc(s.txt)}</b> — ${esc(c.benef)} · <b>${fmt$(c.importe)}</b> · vence ${fmtF(c.venc)}
+      ${c.numero ? ` · Cheque N° ${esc(c.numero)}` : ''}${c.banco ? ` (${esc(c.banco)})` : ''}
+      <span class="no-print" style="float:right"><button class="btn ok sm" onclick="abrirCobro('${c.id}')">Cobrado</button></span>
+    </div>`;
+  }).join('');
+}
+
+function renderTabla() {
+  const lista = filtrados();
+  $('tbody').innerHTML = lista.length ? lista.map(c => {
+    const s = situacion(c);
+    const extra = c.estado === 'cobrado' ? `<div class="muted">el ${fmtF(c.fechaCobro)}</div>` : '';
+    const acc = c.estado === 'pendiente'
+      ? `<button class="btn ok sm" onclick="abrirCobro('${c.id}')" title="Marcar cobrado">✓</button>
+         <button class="btn sec sm" onclick="editar('${c.id}')" title="Editar">✎</button>
+         <button class="btn sec sm" onclick="anular('${c.id}')" title="Anular">⊘</button>`
+      : `<button class="btn sec sm" onclick="reactivar('${c.id}')" title="Volver a pendiente">↺</button>`;
+    return `<tr>
+      <td>${esc(c.numero) || '<span class="muted">—</span>'}${c.banco ? `<div class="muted">${esc(c.banco)}</div>` : ''}</td>
+      <td>${fmtF(c.emision)}</td>
+      <td><b>${fmtF(c.venc)}</b></td>
+      <td>${esc(c.benef)}</td>
+      <td>${esc(c.concepto)}</td>
+      <td class="num">${fmt$(c.importe)}</td>
+      <td><span class="tag ${s.cls}">${esc(s.txt)}</span>${extra}</td>
+      <td class="no-print"><div class="acc">${acc}<button class="btn sec sm" onclick="eliminar('${c.id}')" title="Eliminar">🗑</button></div></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="8" class="empty">No hay cheques para mostrar.</td></tr>`;
+  $('totalLista').textContent = fmt$(lista.reduce((s, c) => s + c.importe, 0));
+}
+
+function renderListas() {
+  const uniq = k => [...new Set(cheques.map(c => c[k]).filter(Boolean))].sort();
+  $('benefs').innerHTML = uniq('benef').map(v => `<option value="${esc(v)}">`).join('');
+  $('bancos').innerHTML = uniq('banco').map(v => `<option value="${esc(v)}">`).join('');
+}
+
+/* ---------- Notificaciones ---------- */
+function actualizarBtnNotif() {
+  const b = $('btnNotif');
+  if (!('Notification' in window)) { b.style.display = 'none'; return; }
+  b.textContent = Notification.permission === 'granted' ? '🔔 Avisos activos' : '🔔 Activar avisos';
+}
+$('btnNotif').addEventListener('click', async () => {
+  if (!('Notification' in window)) return;
+  await Notification.requestPermission();
+  actualizarBtnNotif(); notificar(true);
+});
+
+function notificar(forzar) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const hoy = hoyISO();
+  let enviados = {};
+  try { enviados = JSON.parse(localStorage.getItem(KEY + '_notif')) || {}; } catch (e) {}
+  alertasActuales().forEach(c => {
+    const clave = c.id + '_' + hoy;
+    if (enviados[clave] && !forzar) return;
+    const s = situacion(c);
+    try {
+      new Notification('Cheque: ' + s.txt, { body: `${c.benef} — ${fmt$(c.importe)} — vence ${fmtF(c.venc)}`, tag: c.id });
+    } catch (e) {}
+    enviados[clave] = 1;
+  });
+  try { localStorage.setItem(KEY + '_notif', JSON.stringify(enviados)); } catch (e) {}
+}
+
+/* ---------- Exportar / Respaldo ---------- */
+function descargar(nombre, contenido, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+  a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function exportarCSV() {
+  const enc = ['N° cheque', 'Banco', 'Emisión', 'Vencimiento', 'Beneficiario', 'Concepto', 'Importe', 'Estado', 'Fecha cobro'];
+  const filas = filtrados().map(c => [c.numero, c.banco, fmtF(c.emision), fmtF(c.venc), c.benef, c.concepto,
+    c.importe.toLocaleString('es-AR', { minimumFractionDigits: 2 }), situacion(c).txt, fmtF(c.fechaCobro)]);
+  const csv = [enc, ...filas].map(f => f.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  descargar(`cheques_${hoyISO()}.csv`, '\ufeff' + csv, 'text/csv;charset=utf-8');
+}
+function exportarJSON() {
+  descargar(`respaldo_cheques_${hoyISO()}.json`, JSON.stringify({ version: 1, fecha: new Date().toISOString(), cheques }, null, 2), 'application/json');
+  toast('Respaldo descargado');
+}
+$('fileImp').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      const lista = Array.isArray(d) ? d : d.cheques;
+      if (!Array.isArray(lista)) throw 0;
+      if (!confirm(`Se restaurarán ${lista.length} cheque(s) y se reemplazarán los ${cheques.length} actuales. ¿Continuar?`)) return;
+      cheques = lista; guardar(); render(); toast('Respaldo restaurado');
+    } catch (err) { alert('El archivo no es un respaldo válido.'); }
+    e.target.value = '';
+  };
+  r.readAsText(f);
+});
+
+/* ---------- Inicio ---------- */
+cargar(); limpiarForm(); render(); actualizarBtnNotif(); notificar(false);
+setInterval(() => { render(); notificar(false); }, 60 * 60 * 1000); // revisa cada hora si queda abierta
+</script>
+</body>
+</html>
