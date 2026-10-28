@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f4c5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Relevamiento Cloacal · Comuna de Alcorta</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{
+  --pri:#0f4c5c; --pri2:#14657a; --bg:#f1f5f9; --card:#fff; --tx:#0f172a; --mut:#64748b; --bd:#e2e8f0;
+  --si:#16a34a; --red:#f59e0b; --no:#dc2626; --dud:#7c3aed; --pend:#94a3b8;
+  --hdr:54px; --nav:62px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--tx);background:var(--bg)}
+button{font:inherit;cursor:pointer}
+header{position:fixed;top:0;left:0;right:0;height:calc(var(--hdr) + env(safe-area-inset-top));padding:env(safe-area-inset-top) 14px 0;background:var(--pri);color:#fff;display:flex;align-items:center;gap:10px;z-index:1000}
+header h1{font-size:16px;margin:0;line-height:1.1;flex:1}
+header h1 small{display:block;font-weight:400;opacity:.75;font-size:12px}
+.sync{display:flex;align-items:center;gap:6px;font-size:12px;background:rgba(255,255,255,.12);padding:5px 9px;border-radius:99px;white-space:nowrap}
+.sync i{width:9px;height:9px;border-radius:50%;background:#cbd5e1;display:inline-block}
+.sync.online i{background:#4ade80}.sync.offline i{background:#fbbf24}.sync.error i{background:#f87171}
+main{position:fixed;top:calc(var(--hdr) + env(safe-area-inset-top));bottom:calc(var(--nav) + env(safe-area-inset-bottom));left:0;right:0}
+.view{position:absolute;inset:0;overflow:auto;display:none}
+.view.on{display:block}
+#vMapa{overflow:hidden}
+#map{position:absolute;inset:0}
+nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:#fff;border-top:1px solid var(--bd);display:flex;z-index:1000}
+nav button{flex:1;border:0;background:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px}
+nav button span{font-size:21px;line-height:1}
+nav button.on{color:var(--pri);font-weight:600}
+.legend{position:absolute;top:10px;left:10px;z-index:500;background:rgba(255,255,255,.95);border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.6}
+.legend b{font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.fab{position:absolute;z-index:500;border:0;border-radius:99px;box-shadow:0 3px 10px rgba(0,0,0,.25);background:#fff;color:var(--tx)}
+#btnLoc{right:10px;bottom:96px;width:46px;height:46px;font-size:20px}
+#btnLoc.on{background:#2563eb;color:#fff}
+#btnNext{left:50%;transform:translateX(-50%);bottom:16px;padding:13px 20px;background:var(--pri);color:#fff;font-weight:600;font-size:15px;white-space:nowrap}
+.leaflet-bottom.leaflet-right{margin-bottom:6px}
+.empty[hidden]{display:none}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:600;pointer-events:none}
+.empty div{pointer-events:auto;background:#fff;border-radius:14px;padding:20px;max-width:320px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.wrap{padding:14px;max-width:760px;margin:0 auto}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid var(--bd)}
+.card h3{margin:0 0 8px;font-size:15px}
+.card p{margin:0 0 10px;color:var(--mut);font-size:13px}
+input,select,textarea{font:inherit;width:100%;padding:11px 12px;border:1px solid var(--bd);border-radius:10px;background:#fff;color:var(--tx)}
+textarea{resize:vertical;min-height:64px}
+label{font-size:13px;color:var(--mut);display:block;margin:8px 0 4px}
+.btn{border:1px solid var(--bd);background:#fff;padding:11px 14px;border-radius:10px;font-weight:600}
+.btn.primary{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.danger{color:var(--no);border-color:#fecaca}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.searchbar{position:sticky;top:0;background:var(--bg);padding:10px 14px;display:flex;gap:8px;z-index:5;max-width:760px;margin:0 auto}
+.searchbar input{flex:2}.searchbar select{flex:1}
+.item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:11px 12px;margin:0 14px 8px;max-width:732px}
+@media(min-width:760px){.item{margin:0 auto 8px}}
+.item .dot{width:14px;height:14px;flex:none;margin:0}
+.item .t{flex:1;min-width:0}
+.item .t b{display:block;font-size:14px}
+.item .t small{color:var(--mut);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .st{font-size:12px;color:var(--mut);text-align:right;flex:none}
+.more{text-align:center;color:var(--mut);font-size:13px;padding:8px 0 20px}
+.big{font-size:34px;font-weight:700;color:var(--pri);font-variant-numeric:tabular-nums}
+.bar{height:12px;background:#e2e8f0;border-radius:99px;overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.stat{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.stat:last-child{border:0}
+.stat b{font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--bd)}
+th{color:var(--mut);font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.minibar{height:7px;background:#e2e8f0;border-radius:9px;overflow:hidden;min-width:60px}
+.minibar i{display:block;height:100%;background:var(--pri)}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:1500;display:none}
+.scrim.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:#fff;border-radius:18px 18px 0 0;padding:8px 16px calc(16px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto;transform:translateY(105%);transition:transform .22s ease;max-width:640px;margin:0 auto;box-shadow:0 -6px 24px rgba(0,0,0,.18)}
+.sheet.on{transform:none}
+.grab{width:42px;height:5px;background:#cbd5e1;border-radius:9px;margin:2px auto 10px}
+.sh-head{display:flex;align-items:flex-start;gap:10px}
+.sh-head div{flex:1}
+.sh-head h2{margin:0;font-size:19px}
+.sh-head p{margin:3px 0 0;color:var(--mut);font-size:13px}
+.x{border:0;background:#f1f5f9;width:36px;height:36px;border-radius:50%;font-size:16px}
+.cur{margin:10px 0;font-size:13px;color:var(--mut);background:#f8fafc;border-radius:10px;padding:8px 10px}
+.estados{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.est{border:2px solid var(--bd);background:#fff;border-radius:14px;padding:14px 10px;text-align:left;min-height:78px}
+.est b{display:flex;align-items:center;font-size:15px}
+.est small{display:block;color:var(--mut);font-size:12px;margin-top:4px;line-height:1.3}
+.est.sel{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,#fff)}
+.link{border:0;background:none;color:var(--mut);text-decoration:underline;font-size:13px;margin-top:12px;padding:4px 0}
+/* modal */
+.modal{position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:20px}
+.modal.on{display:flex}
+.modal .card{max-width:380px;width:100%;margin:0}
+.toast{position:fixed;left:50%;bottom:calc(var(--nav) + 20px);transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:3000;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.hint{font-size:12px;color:var(--mut);margin-top:6px}
+code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Relevamiento Cloacal<small id="hdrUser">Comuna de Alcorta</small></h1>
+  <div class="sync" id="sync"><i></i><span>…</span></div>
+</header>
+
+<main>
+  <section class="view on" id="vMapa">
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+    <button class="fab" id="btnLoc" title="Mi ubicación">📍</button>
+    <button class="fab" id="btnNext">Siguiente pendiente cercano ›</button>
+    <div class="empty" id="emptyMap" hidden><div>
+      <h3 style="margin:0 0 6px">Sin parcelas cargadas</h3>
+      <p style="color:var(--mut);font-size:14px;margin:0 0 12px">Cargá el GeoJSON de parcelas del Catastro desde Ajustes, o configurá Firebase para bajar las que ya publicó la administración.</p>
+      <button class="btn primary" onclick="irVista('vAjustes')">Ir a Ajustes</button>
+    </div></div>
+  </section>
+
+  <section class="view" id="vLista">
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="Buscar manzana, parcela, cuenta, calle…">
+      <select id="fEstado"></select>
+    </div>
+    <div id="lista"></div>
+  </section>
+
+  <section class="view" id="vAvance"><div class="wrap" id="avance"></div></section>
+
+  <section class="view" id="vAjustes"><div class="wrap">
+    <div class="card">
+      <h3>Relevador</h3>
+      <label for="cfgNombre">Tu nombre (queda registrado en cada terreno que marcás)</label>
+      <div class="row"><input id="cfgNombre" placeholder="Ej: Juan P."><button class="btn primary" style="flex:0 0 auto" id="btnNombre">Guardar</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Sincronización (Firebase)</h3>
+      <p>Pegá la configuración web de tu proyecto Firebase (el objeto <code>firebaseConfig</code>). Sin esto la app funciona sólo en este dispositivo.</p>
+      <textarea id="cfgFb" rows="6" placeholder='{ apiKey: "...", authDomain: "...", databaseURL: "https://....firebaseio.com", projectId: "..." }'></textarea>
+      <label for="cfgBase">Ruta en la base de datos</label>
+      <input id="cfgBase" placeholder="relevamientoCloacas">
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="btnFb">Guardar y conectar</button><button class="btn" id="btnFbOff">Quitar</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Cargar parcelas</h3>
+      <p>GeoJSON exportado del Catastro (polígonos en lat/lng) o CSV con manzana, parcela y opcionalmente latitud/longitud. Los relevamientos ya hechos se conservan: se vinculan por ID.</p>
+      <input type="file" id="fImport" accept=".geojson,.json,.csv,.txt">
+      <div id="mapeo" hidden>
+        <div class="grid2" id="mapeoCampos"></div>
+        <div class="hint" id="mapeoInfo"></div>
+        <button class="btn primary" id="btnPublicar" style="width:100%;margin-top:10px">Publicar parcelas</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Capa de red cloacal (referencia)</h3>
+      <p>GeoJSON de la red exportado del CAD: colectores, bocas de inspección y conexiones domiciliarias. Se muestra en el mapa de todos como guía; no se marca.</p>
+      <input type="file" id="fRed" accept=".geojson,.json">
+      <div class="hint" id="redInfo"></div>
+    </div>
+
+    <div class="card">
+      <h3>Exportar</h3>
+      <p>Para cargar el resultado en el Catastro o armar el informe.</p>
+      <div class="row"><button class="btn" id="btnCSV">CSV (Excel)</button><button class="btn" id="btnGeo">GeoJSON</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Mantenimiento</h3>
+      <div class="row"><button class="btn" id="btnRecargar">Volver a bajar parcelas</button><button class="btn danger" id="btnBorrarTodo">Borrar relevamientos</button></div>
+    </div>
+  </div></section>
+</main>
+
+<nav>
+  <button class="on" data-v="vMapa"><span>🗺️</span>Mapa</button>
+  <button data-v="vLista"><span>📋</span>Lista</button>
+  <button data-v="vAvance"><span>📊</span>Avance</button>
+  <button data-v="vAjustes"><span>⚙️</span>Ajustes</button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <div class="sh-head">
+    <div><h2 id="shTitle"></h2><p id="shSub"></p></div>
+    <button class="x" id="shClose" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="cur" id="shCur"></div>
+  <div id="shOtros" style="font-size:13px;color:var(--mut)"></div>
+  <div class="estados" id="shEstados"></div>
+  <textarea id="shObs" placeholder="Observaciones (opcional): cámara, pozo, vecino informó…"></textarea>
+  <div class="row" style="margin-top:10px">
+    <button class="btn primary" id="shSave">Guardar</button>
+    <button class="btn" id="shNext">Guardar y siguiente ›</button>
+  </div>
+  <button class="link" id="shClear">Quitar relevamiento de este terreno</button>
+</div>
+
+<div class="modal" id="mNombre"><div class="card">
+  <h3>¿Quién releva?</h3>
+  <p>Tu nombre queda guardado en cada terreno que marques.</p>
+  <input id="mNombreIn" placeholder="Nombre y apellido" autocomplete="name">
+  <button class="btn primary" id="mNombreOk" style="width:100%;margin-top:10px">Empezar</button>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ===== Configuración ===== */
+const ESTADOS = {
+  si:  {t:'Conectada',        d:'Tiene conexión a la red cloacal',             c:'#16a34a'},
+  red: {t:'Red sin conectar', d:'Pasa la red por el frente, no está conectada', c:'#f59e0b'},
+  no:  {t:'Sin red',          d:'No hay red cloacal frente al terreno',        c:'#dc2626'},
+  dud: {t:'No verificado',    d:'Cerrado, baldío o no se pudo constatar',      c:'#7c3aed'}
+};
+const PEND = '#94a3b8';
+const CENTRO = [-33.536, -61.122]; // Alcorta
+const LS_CFG = 'rc_cfg';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fbKey = s => String(s).trim().replace(/[.#$\[\]\/]/g, '_');
+const cmp = (a,b) => String(a||'').localeCompare(String(b||''), 'es', {numeric:true});
+
+let cfg = {};
+try { cfg = JSON.parse(localStorage.getItem(LS_CFG) || '{}'); } catch(e) { cfg = {}; }
+cfg.base = cfg.base || 'relevamientoCloacas';
+// Base de la Comuna, fija para que los relevadores no tengan que configurar nada
+const FB_DEFAULT = {
+  databaseURL: 'https://relevamiento-cloacas-alcorta-default-rtdb.firebaseio.com',
+  projectId: 'relevamiento-cloacas-alcorta'
+};
+if(!cfg.fb && !cfg.fbOff) cfg.fb = FB_DEFAULT;
+const saveCfg = () => localStorage.setItem(LS_CFG, JSON.stringify(cfg));
+
+let parcelas = {};   // id -> {mz, pc, cta, dir, g}
+let relev = {};      // id -> {e, o, u, t}
+let cola = [];       // [{id, rec}] cambios sin subir
+let pVersion = 0;
+let db = null, online = false, flushing = false;
+let map, layer, layersById = {}, centros = {}, fitted = false;
+let red = null, redV = 0, redLayer = null, ctlLayers = null;
+let grupos = {}, grupoDe = {};
+const hermanos = id => grupoDe[id] ? grupos[grupoDe[id]] : [id];
+const capaDe = id => layersById[id] || (grupoDe[id] && layersById[grupos[grupoDe[id]][0]]);
+let selId = null, shSel = null, miPos = null, locMarker = null, locCircle = null, locOn = false;
+
+/* ===== IndexedDB (caché local) ===== */
+const idb = (() => {
+  let p;
+  const open = () => p || (p = new Promise((res, rej) => {
+    const r = indexedDB.open('relevCloacas', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  }));
+  const tx = (mode, fn) => open().then(d => new Promise((res, rej) => {
+    const t = d.transaction('kv', mode); const req = fn(t.objectStore('kv'));
+    t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error);
+  }));
+  return { get: k => tx('readonly', s => s.get(k)), set: (k, v) => tx('readwrite', s => s.put(v, k)) };
+})();
+let saveT;
+function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('cola', cola); updSync(); }, 250); }
+
+/* ===== UI utilitarios ===== */
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+function fmtFecha(ts){ if(!ts) return ''; const d = new Date(ts); return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}); }
+function titulo(id){
+  const p = parcelas[id] || {};
+  if(!(p.mz || p.pc)) return p.cta ? 'Cta. ' + p.cta : id;
+  return `Mz ${p.mz || '–'} · Lote ${p.pc || '–'}` + ((!p.pc || /^a\/?p$/i.test(p.pc)) && p.cta ? ` · Cta. ${p.cta}` : '');
+}
+function colorDe(id){ const r = relev[id]; return r && ESTADOS[r.e] ? ESTADOS[r.e].c : PEND; }
+
+function updSync(){
+  const el = $('#sync'), sp = el.querySelector('span');
+  el.className = 'sync';
+  const pend = cola.length;
+  if(!cfg.fb){ sp.textContent = 'Modo local'; return; }
+  if(!db){ el.classList.add('error'); sp.textContent = 'Error'; return; }
+  if(online){ el.classList.add('online'); sp.textContent = pend ? `Subiendo ${pend}…` : 'En línea'; }
+  else { el.classList.add('offline'); sp.textContent = pend ? `Sin señal · ${pend} pend.` : 'Sin señal'; }
+}
+function updUser(){ $('#hdrUser').textContent = cfg.nombre ? `Relevador: ${cfg.nombre}` : 'Comuna de Alcorta'; }
+
+function irVista(v){
+  document.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x.id === v));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if(v === 'vMapa') setTimeout(() => map.invalidateSize(), 50);
+  renderAll();
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => irVista(b.dataset.v));
+const vistaActual = () => document.querySelector('.view.on').id;
+
+/* ===== Mapa ===== */
+function initMap(){
+  map = L.map('map', {preferCanvas:true, zoomControl:false}).setView(CENTRO, 15);
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:21, maxNativeZoom:19, attribution:'© OpenStreetMap'});
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:21, maxNativeZoom:19, attribution:'Esri'});
+  osm.addTo(map);
+  ctlLayers = L.control.layers({'Calles':osm, 'Satélite':sat}, null, {position:'topright'}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  map.on('locationfound', e => {
+    const first = !miPos; miPos = e.latlng;
+    if(!locMarker){
+      locCircle = L.circle(e.latlng, {radius:e.accuracy, color:'#2563eb', weight:1, fillOpacity:.08, interactive:false}).addTo(map);
+      locMarker = L.circleMarker(e.latlng, {radius:8, color:'#fff', weight:3, fillColor:'#2563eb', fillOpacity:1, interactive:false}).addTo(map);
+    } else { locMarker.setLatLng(e.latlng); locCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
+    if(first) map.setView(e.latlng, Math.max(map.getZoom(), 18));
+  });
+  map.on('locationerror', e => { toast('No se pudo obtener la ubicación: ' + e.message); locOn = false; $('#btnLoc').classList.remove('on'); });
+  buildLayer();
+}
+function styleFor(id){
+  // terreno con varias cuentas: pendiente mientras quede alguna sin relevar; si no, el color de la primera
+  const hs = hermanos(id), pend = hs.find(h => !relev[h]);
+  const ref = hs.length > 1 ? (pend !== undefined ? pend : hs[0]) : id;
+  const r = relev[ref], c = colorDe(ref), sel = hs.includes(selId);
+  return {color: sel ? '#0f172a' : c, weight: sel ? 3.5 : 1.2, fillColor:c, fillOpacity: r ? .55 : .22, opacity:1};
+}
+function restyle(id){ const l = capaDe(id); if(l && l.setStyle) l.setStyle(styleFor(hermanos(id)[0])); }
+function buildLayer(){
+  if(layer) map.removeLayer(layer);
+  layersById = {}; centros = {}; grupos = {}; grupoDe = {};
+  const feats = [];
+  for(const id in parcelas){
+    const g = parcelas[id].g; if(!g) continue;
+    const gk = JSON.stringify(g.coordinates).slice(0, 120); // misma geometría = mismo terreno
+    (grupos[gk] = grupos[gk] || []).push(id); grupoDe[id] = gk;
+    // en el mapa se dibuja un solo polígono por terreno; el resto se accede desde la ficha
+    if(grupos[gk].length === 1) feats.push({type:'Feature', properties:{id}, geometry:g});
+  }
+  layer = L.geoJSON({type:'FeatureCollection', features:feats}, {
+    style: f => styleFor(f.properties.id),
+    pointToLayer: (f, ll) => L.circleMarker(ll, {radius:8}),
+    onEachFeature: (f, l) => {
+      const id = f.properties.id; layersById[id] = l;
+      let cc = null; try { cc = l.getLatLng ? l.getLatLng() : l.getBounds().getCenter(); } catch(e) {}
+      if(cc) hermanos(id).forEach(h => centros[h] = cc);
+      // al tocar, abre la primera cuenta pendiente del terreno
+      l.on('click', e => { L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
+    }
+  }).addTo(map);
+  if(feats.length && !fitted){ try { map.fitBounds(layer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
+  if(redLayer) redLayer.bringToFront();
+  $('#emptyMap').hidden = Object.keys(parcelas).length > 0 || !!red;
+}
+/* Capa de red cloacal: solo referencia, no interactiva (los toques pasan a las parcelas) */
+const RED_EST = {
+  colector:  {color:'#7c2d12', weight:3, opacity:.9, fill:false, interactive:false},
+  boca:      {radius:5, color:'#fff', weight:1.5, fillColor:'#1e293b', fillOpacity:1, interactive:false},
+  conexion:  {radius:3, color:'#0891b2', weight:0, fillColor:'#0891b2', fillOpacity:.9, interactive:false}
+};
+function tipoRed(t){ t = String(t || '').toLowerCase(); return t.includes('boca') ? 'boca' : t.includes('conex') ? 'conexion' : 'colector'; }
+function buildRed(){
+  if(redLayer){ map.removeLayer(redLayer); ctlLayers.removeLayer(redLayer); redLayer = null; }
+  if(!red || !red.length){ $('#redInfo').textContent = 'Sin capa de red cargada.'; return; }
+  redLayer = L.geoJSON({type:'FeatureCollection', features: red.map(x => ({type:'Feature', properties:{t:x.t}, geometry:x.g}))}, {
+    style: f => RED_EST[tipoRed(f.properties.t)],
+    pointToLayer: (f, ll) => L.circleMarker(ll, RED_EST[tipoRed(f.properties.t)])
+  }).addTo(map);
+  ctlLayers.addOverlay(redLayer, 'Red cloacal');
+  const c = {boca:0, conexion:0, colector:0}; red.forEach(x => c[tipoRed(x.t)]++);
+  $('#redInfo').textContent = `Cargada: ${c.colector} tramos de colector · ${c.boca} bocas de inspección · ${c.conexion} conexiones domiciliarias.`;
+  if(!fitted && !Object.keys(centros).length){ try { map.fitBounds(redLayer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
+  $('#emptyMap').hidden = true;
+}
+$('#fRed').onchange = async ev => {
+  const file = ev.target.files[0]; if(!file) return;
+  try{
+    const gj = JSON.parse(await file.text());
+    const feats = (gj.features || []).filter(f => f.geometry && f.geometry.coordinates && !/etiqueta|texto/i.test((f.properties || {}).tipo || ''));
+    if(!feats.length) throw new Error('No encontré elementos de red');
+    const c = primerCoord(feats[0].geometry);
+    if(c && (Math.abs(c[0]) > 180 || Math.abs(c[1]) > 90)) throw new Error('Las coordenadas no están en lat/lng (WGS84).');
+    const arr = feats.map(f => ({t: String((f.properties || {}).tipo || ''), g: redondear(f.geometry)}));
+    if(!confirm(`Publicar la capa de red con ${arr.length} elementos${db ? ' para todos' : ''}?`)) return;
+    const v = Date.now();
+    if(db){ await db.ref(cfg.base).child('red').set({v, f:arr}); }
+    else { red = arr; redV = v; await idb.set('red', red); await idb.set('redv', v); buildRed(); }
+    toast('Capa de red publicada');
+  }catch(e){ toast('No pude cargar la red: ' + e.message); }
+  ev.target.value = '';
+};
+function irA(id){
+  const l = capaDe(id);
+  if(l){
+    if(vistaActual() !== 'vMapa') irVista('vMapa');
+    if(l.getLatLng) map.setView(l.getLatLng(), Math.max(map.getZoom(), 19));
+    else map.fitBounds(l.getBounds(), {maxZoom:19, padding:[60,60]});
+  }
+  abrirSheet(id);
+}
+$('#btnLoc').onclick = () => {
+  if(locOn){ if(miPos) map.setView(miPos, Math.max(map.getZoom(), 18)); return; }
+  locOn = true; $('#btnLoc').classList.add('on');
+  map.locate({watch:true, enableHighAccuracy:true, setView:false, maximumAge:5000});
+};
+function siguientePendiente(excluir){
+  // Sin ubicación en mapa: sigue el orden de la lista (manzana → lote)
+  if(!Object.keys(centros).length || (excluir && !centros[excluir])){
+    const ids = idsOrdenados(), i = excluir ? ids.indexOf(excluir) : -1;
+    for(let k = 1; k <= ids.length; k++){ const id = ids[(i + k + ids.length) % ids.length]; if(id !== excluir && !relev[id]) return id; }
+    return null;
+  }
+  let ref = miPos || (excluir && centros[excluir]) || map.getCenter();
+  let best = null, bd = Infinity;
+  for(const id in centros){
+    if(id === excluir || relev[id]) continue;
+    const d = ref.distanceTo(centros[id]);
+    if(d < bd){ bd = d; best = id; }
+  }
+  return best;
+}
+$('#btnNext').onclick = () => {
+  const id = siguientePendiente(selId);
+  if(id) irA(id); else toast('No quedan terrenos pendientes en el mapa 🎉');
+};
+
+/* ===== Leyenda ===== */
+function contar(){
+  const c = {pend:0, total:0}; for(const k in ESTADOS) c[k] = 0;
+  for(const id in parcelas){ c.total++; const r = relev[id]; if(r && c[r.e] !== undefined) c[r.e]++; else c.pend++; }
+  return c;
+}
+function renderLegend(){
+  const c = contar();
+  $('#legend').innerHTML = Object.entries(ESTADOS).map(([k,e]) => `<div><span class="dot" style="background:${e.c}"></span>${e.t} <b>${c[k]}</b></div>`).join('')
+    + `<div><span class="dot" style="background:${PEND}"></span>Pendiente <b>${c.pend}</b></div>`
+    + (red ? `<div style="border-top:1px solid var(--bd);margin-top:4px;padding-top:4px"><span style="display:inline-block;width:14px;height:3px;background:#7c2d12;vertical-align:3px;margin-right:6px"></span>Colector</div><div><span class="dot" style="background:#1e293b"></span>Boca insp. <span class="dot" style="background:#0891b2;width:7px;height:7px;margin-left:6px"></span>Conexión</div>` : '')
+    + (c.total && c.total > Object.keys(centros).length ? `<div style="color:var(--mut);margin-top:4px">${c.total - Object.keys(centros).length} sin ubicación → ver Lista</div>` : '');
+}
+
+/* ===== Ficha del terreno ===== */
+$('#shEstados').innerHTML = Object.entries(ESTADOS).map(([k,e]) =>
+  `<button class="est" data-e="${k}" style="--c:${e.c}"><b><span class="dot" style="background:${e.c}"></span>${e.t}</b><small>${e.d}</small></button>`).join('');
+$('#shEstados').onclick = ev => {
+  const b = ev.target.closest('.est'); if(!b) return;
+  shSel = b.dataset.e; marcarSel();
+};
+function marcarSel(){ document.querySelectorAll('.est').forEach(b => b.classList.toggle('sel', b.dataset.e === shSel)); }
+function abrirSheet(id){
+  const prev = selId; selId = id; if(prev) restyle(prev); restyle(id);
+  const p = parcelas[id] || {}, r = relev[id];
+  $('#shTitle').textContent = titulo(id);
+  $('#shSub').textContent = [p.tit, p.dir, p.cta ? 'Cta. ' + p.cta : '', p.pad ? 'Padrón ' + p.pad : '', p.reg ? 'Registro: ' + p.reg : ''].filter(Boolean).join(' · ') || 'ID ' + id;
+  pintarCur(id);
+  const otros = hermanos(id).filter(h => h !== id);
+  $('#shOtros').innerHTML = otros.length ? `Otras cuentas en este terreno: ` + otros.map(h =>
+    `<button class="btn" style="padding:5px 9px;margin:3px 4px 0 0;font-size:12px" onclick="abrirSheet('${esc(h)}')"><span class="dot" style="background:${colorDe(h)};margin-right:4px"></span>Cta. ${esc(parcelas[h].cta || h)}</button>`).join('') : '';
+  shSel = r ? r.e : null; marcarSel();
+  $('#shObs').value = r ? (r.o || '') : '';
+  $('#shClear').style.display = r ? '' : 'none';
+  $('#sheet').classList.add('on'); $('#scrim').classList.add('on');
+}
+function pintarCur(id){
+  const r = relev[id];
+  $('#shCur').innerHTML = r
+    ? `Actual: <b style="color:${colorDe(id)}">${esc(ESTADOS[r.e] ? ESTADOS[r.e].t : r.e)}</b> · ${esc(r.u || '')} · ${fmtFecha(r.t)}`
+    : 'Sin relevar todavía.';
+}
+function cerrarSheet(){
+  $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on');
+  const prev = selId; selId = null; if(prev) restyle(prev);
+}
+$('#shClose').onclick = cerrarSheet; $('#scrim').onclick = cerrarSheet;
+function guardarSheet(){
+  if(!selId) return false;
+  if(!shSel){ toast('Elegí un estado'); return false; }
+  if(!cfg.nombre){ pedirNombre(); return false; }
+  guardar(selId, {e:shSel, o:$('#shObs').value.trim(), u:cfg.nombre, t:Date.now()});
+  toast(`${titulo(selId)}: ${ESTADOS[shSel].t}`);
+  return true;
+}
+$('#shSave').onclick = () => { if(guardarSheet()) cerrarSheet(); };
+$('#shNext').onclick = () => {
+  const actual = selId;
+  if(!guardarSheet()) return;
+  const sig = siguientePendiente(actual);
+  if(sig) irA(sig); else { cerrarSheet(); toast('No quedan terrenos pendientes en el mapa 🎉'); }
+};
+$('#shClear').onclick = () => {
+  if(!selId || !confirm(`¿Quitar el relevamiento de ${titulo(selId)}? Vuelve a quedar pendiente.`)) return;
+  guardar(selId, null); cerrarSheet();
+};
+
+/* ===== Guardado y sincronización ===== */
+function guardar(id, rec){
+  if(rec) relev[id] = rec; else delete relev[id];
+  if(cfg.fb){ cola = cola.filter(q => q.id !== id); cola.push({id, rec}); }
+  saveLocal(); restyle(id); renderAll(); flush();
+}
+async function flush(){
+  if(!db || !online || flushing || !cola.length) return;
+  flushing = true; updSync();
+  const B = db.ref(cfg.base);
+  try{
+    while(cola.length){
+      const q = cola[0];
+      await B.child('relev/' + q.id).set(q.rec || null);
+      B.child('hist/' + q.id).push(q.rec || {e:'borrado', u:cfg.nombre || '', t:Date.now()});
+      cola = cola.filter(x => x !== q); saveLocal();
+    }
+  }catch(e){ console.warn(e); toast('No se pudo sincronizar: ' + e.message); }
+  flushing = false; updSync();
+}
+setInterval(flush, 20000);
+const pendientesSet = () => new Set(cola.map(q => q.id));
+
+function conectarFirebase(){
+  updSync();
+  if(!cfg.fb) return;
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(cfg.fb);
+    db = firebase.database();
+  }catch(e){ db = null; updSync(); toast('Error de Firebase: ' + e.message); return; }
+  const B = db.ref(cfg.base);
+  db.ref('.info/connected').on('value', s => { online = !!s.val(); updSync(); if(online) flush(); });
+  B.child('meta/version').on('value', async s => {
+    const v = s.val() || 0;
+    if(v && v !== pVersion){
+      try{
+        const snap = await B.child('parcelas').once('value');
+        parcelas = snap.val() || {}; pVersion = v;
+        await idb.set('parcelas', parcelas); await idb.set('pversion', v);
+        buildLayer(); renderAll();
+        toast(`Parcelas actualizadas: ${Object.keys(parcelas).length}`);
+      }catch(e){ toast('No se pudieron bajar las parcelas: ' + e.message); }
+    }
+  }, e => toast('Sin permiso de lectura en Firebase: ' + e.message));
+  B.child('red/v').on('value', async s => {
+    const v = s.val() || 0;
+    if(v && v !== redV){
+      try{
+        const snap = await B.child('red/f').once('value');
+        red = snap.val() || []; if(!Array.isArray(red)) red = Object.values(red);
+        redV = v; await idb.set('red', red); await idb.set('redv', v);
+        buildRed(); renderLegend();
+      }catch(e){ console.warn('red', e); }
+    }
+  });
+  const R = B.child('relev');
+  R.once('value', s => {
+    const srv = s.val() || {}, pend = pendientesSet();
+    for(const id in relev) if(!(id in srv) && !pend.has(id)){ delete relev[id]; restyle(id); }
+    saveLocal(); programarRender();
+  });
+  const upd = s => { if(pendientesSet().has(s.key)) return; relev[s.key] = s.val(); restyle(s.key); saveLocal(); programarRender(); };
+  R.on('child_added', upd); R.on('child_changed', upd);
+  R.on('child_removed', s => { if(pendientesSet().has(s.key)) return; delete relev[s.key]; restyle(s.key); saveLocal(); programarRender(); });
+}
+
+/* ===== Lista ===== */
+$('#fEstado').innerHTML = `<option value="">Todos</option><option value="pend">Pendientes</option>` +
+  Object.entries(ESTADOS).map(([k,e]) => `<option value="${k}">${e.t}</option>`).join('');
+$('#q').oninput = () => renderLista(); $('#fEstado').onchange = () => renderLista();
+function idsOrdenados(){
+  return Object.keys(parcelas).sort((a,b) => { const A = parcelas[a], B = parcelas[b]; return (!A.mz - !B.mz) || cmp(A.mz,B.mz) || cmp(A.pc,B.pc) || cmp(a,b); });
+}
+function renderLista(){
+  let q = $('#q').value.trim().toLowerCase(); const f = $('#fEstado').value;
+  // "mz 46" y "lote 3" filtran exacto por manzana / lote
+  let fMz = null, fPc = null;
+  q = q.replace(/\b(?:mz|manzana|manz)\.?\s*(\S+)/, (_, x) => { fMz = x.replace(/^0+(?=\d)/, ''); return ''; })
+       .replace(/\b(?:lote|pc|parcela)\.?\s*(\S+)/, (_, x) => { fPc = x.replace(/^0+(?=\d)/, ''); return ''; });
+  const terms = q.split(/\s+/).filter(Boolean);
+  const res = idsOrdenados().filter(id => {
+    const r = relev[id];
+    if(fMz !== null && String(parcelas[id].mz).toLowerCase() !== fMz) return false;
+    if(fPc !== null && !String(parcelas[id].pc).toLowerCase().startsWith(fPc)) return false;
+    if(f === 'pend' && r) return false;
+    if(f && f !== 'pend' && (!r || r.e !== f)) return false;
+    if(!terms.length) return true;
+    const p = parcelas[id];
+    const txt = `${id} mz ${p.mz} pc ${p.pc} lote ${p.pc} ${p.cta||''} ${p.pad||''} ${p.tit||''} ${p.dir||''} ${r ? r.o || '' : ''}`.toLowerCase();
+    return terms.every(t => txt.includes(t));
+  });
+  const MAX = 200;
+  if(!Object.keys(parcelas).length){ $('#lista').innerHTML = '<div class="more">No hay parcelas cargadas.</div>'; return; }
+  $('#lista').innerHTML = res.slice(0, MAX).map(id => {
+    const p = parcelas[id], r = relev[id];
+    return `<div class="item" data-id="${esc(id)}"><span class="dot" style="background:${colorDe(id)}"></span>
+      <div class="t"><b>${esc(titulo(id))}</b><small>${esc([p.tit, p.dir, p.cta ? 'Cta. ' + p.cta : ''].filter(Boolean).join(' · ') || (p.g ? '' : 'Sin ubicación en mapa'))}</small></div>
+      <div class="st">${r ? esc(ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) + '<br>' + esc(r.u || '') : 'Pendiente'}</div></div>`;
+  }).join('') + `<div class="more">${res.length > MAX ? `Mostrando ${MAX} de ${res.length}. Afiná la búsqueda.` : `${res.length} terrenos`}</div>`;
+}
+$('#lista').onclick = ev => { const it = ev.target.closest('.item'); if(it) irA(it.dataset.id); };
+
+/* ===== Avance ===== */
+function renderAvance(){
+  const c = contar(), rel = c.total - c.pend, pct = c.total ? Math.round(rel * 100 / c.total) : 0;
+  const porU = {}, porMz = {}, hoy = new Date().toDateString(); let deHoy = 0;
+  for(const id in parcelas){
+    const r = relev[id], mz = parcelas[id].mz || '(sin manzana)';
+    porMz[mz] = porMz[mz] || {t:0, r:0, si:0, red:0, no:0, dud:0}; porMz[mz].t++;
+    if(r){ porMz[mz].r++; if(porMz[mz][r.e] !== undefined) porMz[mz][r.e]++; const u = r.u || '¿?'; porU[u] = (porU[u] || 0) + 1; if(new Date(r.t).toDateString() === hoy) deHoy++; }
+  }
+  const barra = c.total ? Object.entries(ESTADOS).map(([k,e]) => `<i style="width:${c[k]*100/c.total}%;background:${e.c}"></i>`).join('') : '';
+  const mzs = Object.keys(porMz).sort(cmp);
+  $('#avance').innerHTML = `
+    <div class="card"><h3>Avance general</h3>
+      <div class="big">${pct}%</div>
+      <p>${rel} de ${c.total} terrenos relevados · ${deHoy} hoy</p>
+      <div class="bar">${barra}</div></div>
+    <div class="card"><h3>Por estado</h3>
+      ${Object.entries(ESTADOS).map(([k,e]) => `<div class="stat"><span><span class="dot" style="background:${e.c}"></span>${e.t}</span><b>${c[k]}${rel ? ` · ${Math.round(c[k]*100/rel)}%` : ''}</b></div>`).join('')}
+      <div class="stat"><span><span class="dot" style="background:${PEND}"></span>Pendiente</span><b>${c.pend}</b></div></div>
+    <div class="card"><h3>Por relevador</h3>
+      ${Object.entries(porU).sort((a,b) => b[1]-a[1]).map(([u,n]) => `<div class="stat"><span>${esc(u)}</span><b>${n}</b></div>`).join('') || '<p>Todavía no hay relevamientos.</p>'}</div>
+    <div class="card"><h3>Por manzana</h3>
+      <table><thead><tr><th>Mz</th><th>Avance</th><th class="n">Rel.</th><th class="n" style="color:var(--si)">Con.</th><th class="n" style="color:var(--red)">S/c</th><th class="n" style="color:var(--no)">S/red</th></tr></thead><tbody>
+      ${mzs.map(m => { const x = porMz[m]; return `<tr><td>${esc(m)}</td><td><div class="minibar"><i style="width:${x.r*100/x.t}%"></i></div></td><td class="n">${x.r}/${x.t}</td><td class="n">${x.si}</td><td class="n">${x.red}</td><td class="n">${x.no}</td></tr>`; }).join('')}
+      </tbody></table></div>`;
+}
+
+let rafT = null;
+function programarRender(){ if(rafT) return; rafT = requestAnimationFrame(() => { rafT = null; renderAll(); }); }
+function renderAll(){
+  renderLegend();
+  const v = vistaActual();
+  if(v === 'vLista') renderLista();
+  if(v === 'vAvance') renderAvance();
+  if(selId && $('#sheet').classList.contains('on')) pintarCur(selId);
+}
+
+/* ===== Nombre ===== */
+function pedirNombre(){ $('#mNombre').classList.add('on'); $('#mNombreIn').value = cfg.nombre || ''; setTimeout(() => $('#mNombreIn').focus(), 100); }
+$('#mNombreOk').onclick = () => {
+  const n = $('#mNombreIn').value.trim(); if(!n){ toast('Ingresá tu nombre'); return; }
+  cfg.nombre = n; saveCfg(); updUser(); $('#cfgNombre').value = n; $('#mNombre').classList.remove('on');
+};
+$('#mNombreIn').onkeydown = e => { if(e.key === 'Enter') $('#mNombreOk').click(); };
+$('#btnNombre').onclick = () => { const n = $('#cfgNombre').value.trim(); if(!n) return toast('Ingresá un nombre'); cfg.nombre = n; saveCfg(); updUser(); toast('Nombre guardado'); };
+
+/* ===== Firebase config ===== */
+function parseFb(txt){
+  if(/^https:\/\/\S+(firebaseio\.com|firebasedatabase\.app)\/?$/.test(txt)) return {databaseURL: txt.replace(/\/$/, '')};
+  const m = txt.match(/\{[\s\S]*\}/); if(!m) throw new Error('No encontré un objeto { … }');
+  const obj = (new Function('return (' + m[0] + ')'))();
+  if(!obj || !obj.databaseURL) throw new Error('Falta databaseURL (Realtime Database)');
+  return obj;
+}
+$('#btnFb').onclick = () => {
+  try{
+    const txt = $('#cfgFb').value.trim();
+    cfg.fb = txt ? parseFb(txt) : FB_DEFAULT; cfg.fbOff = false;
+    cfg.base = ($('#cfgBase').value.trim() || 'relevamientoCloacas').replace(/^\/+|\/+$/g, '');
+    saveCfg(); toast('Configuración guardada, reconectando…'); setTimeout(() => location.reload(), 700);
+  }catch(e){ toast('Configuración inválida: ' + e.message); }
+};
+$('#btnFbOff').onclick = () => { if(!confirm('¿Quitar Firebase? La app pasa a modo local en este dispositivo.')) return; delete cfg.fb; cfg.fbOff = true; saveCfg(); location.reload(); };
+
+/* ===== Importación ===== */
+let imp = null; // {rows:[{props, geom}], keys:[], tipo}
+const CAMPOS = [
+  ['id',  'ID único (cuenta/partida)', /^(id|cuenta|ctatasa|cta_?tasa|nro_?cuenta|partida|nro_?partida|nomenclatura|codigo)$/i],
+  ['mz',  'Manzana', /^(mz|manz|manzana|mza)$/i],
+  ['pc',  'Parcela / lote', /^(pc|parc|parcela|lote|lt)$/i],
+  ['cta', 'Cuenta de tasa', /^(cta|cuenta|ctatasa|cta_?tasa|nro_?cuenta)$/i],
+  ['pad', 'Padrón', /^(padron|padrón|catastro)$/i],
+  ['tit', 'Titular', /^(titular|propietario|contribuyente)$/i],
+  ['dir', 'Dirección', /^(dir|direccion|dirección|domicilio|calle|ubicacion)$/i],
+  ['reg', 'Estado en registro', /^(registro|estado|situacion|situación)$/i],
+  ['lat', 'Latitud (CSV)', /^(lat|latitud|y)$/i],
+  ['lng', 'Longitud (CSV)', /^(lng|lon|long|longitud|x)$/i]
+];
+function parseCSV(txt){
+  txt = txt.replace(/^\ufeff/, '');
+  const first = txt.split(/\r?\n/)[0] || '';
+  const sep = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ';' : ',';
+  const rows = []; let row = [], f = '', q = false;
+  for(let i = 0; i < txt.length; i++){
+    const ch = txt[i];
+    if(q){ if(ch === '"'){ if(txt[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += ch; }
+    else if(ch === '"') q = true;
+    else if(ch === sep){ row.push(f); f = ''; }
+    else if(ch === '\n' || ch === '\r'){ if(ch === '\r' && txt[i+1] === '\n') i++; row.push(f); f = ''; if(row.some(x => x !== '')) rows.push(row); row = []; }
+    else f += ch;
+  }
+  row.push(f); if(row.some(x => x !== '')) rows.push(row);
+  const head = rows.shift().map(h => h.trim());
+  return rows.map(r => { const o = {}; head.forEach((h, i) => o[h] = (r[i] || '').trim()); return o; });
+}
+function primerCoord(g){ let c = g && g.coordinates; while(Array.isArray(c) && Array.isArray(c[0])) c = c[0]; return c; }
+function redondear(g){
+  const r = c => typeof c[0] === 'number' ? [Math.round(c[0]*1e6)/1e6, Math.round(c[1]*1e6)/1e6] : c.map(r);
+  return {type:g.type, coordinates:r(g.coordinates)};
+}
+$('#fImport').onchange = async ev => {
+  const file = ev.target.files[0]; if(!file) return;
+  const txt = await file.text();
+  try{
+    if(/\.csv$|\.txt$/i.test(file.name)){
+      const rows = parseCSV(txt);
+      imp = {tipo:'csv', rows: rows.map(p => ({props:p, geom:null})), keys: Object.keys(rows[0] || {})};
+    } else {
+      const gj = JSON.parse(txt);
+      if(Array.isArray(gj)){ // listado simple [{...}, {...}] (sin coordenadas)
+        const rows = gj.filter(o => o && typeof o === 'object');
+        if(!rows.length) throw new Error('El listado está vacío');
+        const keys = new Set(); rows.slice(0, 200).forEach(o => Object.keys(o).forEach(k => keys.add(k)));
+        imp = {tipo:'csv', rows: rows.map(p => ({props:p, geom:null})), keys:[...keys]};
+      } else {
+      const feats = gj.type === 'FeatureCollection' ? gj.features : (gj.type === 'Feature' ? [gj] : []);
+      if(!feats.length) throw new Error('El GeoJSON no tiene features');
+      if(feats.slice(0, 200).every(f => /boca|colector|conexion|etiqueta|cloaca/i.test(JSON.stringify(f.properties || {})) && !/manzana|parcela|lote|cuenta|partida/i.test(Object.keys(f.properties || {}).join(' '))))
+        throw new Error('Esto parece la red cloacal, no parcelas. Cargalo en "Capa de red cloacal".');
+      const keys = new Set(); feats.slice(0, 200).forEach(f => Object.keys(f.properties || {}).forEach(k => keys.add(k)));
+      const c = primerCoord(feats.find(f => f.geometry) && feats.find(f => f.geometry).geometry);
+      if(c && (Math.abs(c[0]) > 180 || Math.abs(c[1]) > 90)) throw new Error('Las coordenadas no están en lat/lng. Exportá el GeoJSON en WGS84 (EPSG:4326).');
+      imp = {tipo:'geojson', rows: feats.map(f => ({props:f.properties || {}, geom:f.geometry && f.geometry.coordinates ? f.geometry : null})), keys:[...keys]};
+      }
+    }
+  }catch(e){ imp = null; $('#mapeo').hidden = true; toast('No pude leer el archivo: ' + e.message); return; }
+  $('#mapeoCampos').innerHTML = CAMPOS.filter(c => imp.tipo === 'csv' || (c[0] !== 'lat' && c[0] !== 'lng')).map(([k, lbl, rx]) => {
+    const guess = imp.keys.find(x => rx.test(x.trim())) || '';
+    return `<div><label>${lbl}</label><select data-k="${k}"><option value="">(ninguno)</option>${imp.keys.map(x => `<option ${x === guess ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>`;
+  }).join('');
+  $('#mapeo').hidden = false; infoMapeo();
+};
+$('#mapeoCampos').onchange = infoMapeo;
+function getMapeo(){ const m = {}; document.querySelectorAll('#mapeoCampos select').forEach(s => m[s.dataset.k] = s.value); return m; }
+function construir(){
+  const m = getMapeo(), out = {}; let sinId = 0, dup = 0, conGeo = 0;
+  const val = (pr, k) => m[k] ? String(pr[m[k]] ?? '').trim() : '';
+  const num = s => parseFloat(String(s).replace(',', '.'));
+  const sinCeros = s => s.replace(/\s+/g, ' ').replace(/^0+(?=\d)/, ''); // "046" → "46", "1 C" queda igual
+  for(const r of imp.rows){
+    const pr = r.props, mz = sinCeros(val(pr, 'mz')), pc = sinCeros(val(pr, 'pc'));
+    let id = val(pr, 'id'); if(!id && (mz || pc)) id = `${mz}-${pc}`;
+    if(!id){ sinId++; continue; }
+    let key = fbKey(id);
+    if(out[key]){ dup++; let n = 2; while(out[key + '_' + n]) n++; key = key + '_' + n; }
+    const p = {mz, pc}; const cta = val(pr, 'cta'), dir = val(pr, 'dir');
+    if(cta) p.cta = cta; if(dir) p.dir = dir;
+    for(const k of ['pad', 'tit', 'reg']){ const v = val(pr, k); if(v) p[k] = v; }
+    let g = r.geom;
+    if(!g && m.lat && m.lng){ const la = num(pr[m.lat]), ln = num(pr[m.lng]); if(isFinite(la) && isFinite(ln) && la && ln) g = {type:'Point', coordinates:[ln, la]}; }
+    if(g){ p.g = redondear(g); conGeo++; }
+    out[key] = p;
+  }
+  return {out, sinId, dup, conGeo};
+}
+function infoMapeo(){
+  if(!imp) return;
+  const {out, sinId, dup, conGeo} = construir(), n = Object.keys(out).length;
+  const yaRel = Object.keys(relev).filter(id => out[id]).length;
+  $('#mapeoInfo').innerHTML = `${n} parcelas · ${conGeo} con ubicación en mapa` + (sinId ? ` · ${sinId} sin ID (se omiten)` : '') + (dup ? ` · ${dup} IDs repetidos (se les agrega sufijo)` : '') + (Object.keys(relev).length ? ` · ${yaRel} coinciden con relevamientos existentes` : '');
+  $('#btnPublicar').textContent = `Publicar ${n} parcelas` + (cfg.fb ? ' para todos' : '');
+}
+$('#btnPublicar').onclick = async () => {
+  if(!imp) return;
+  const {out} = construir(), n = Object.keys(out).length;
+  if(!n) return toast('No hay parcelas válidas. Revisá el campo ID / manzana / parcela.');
+  if(!confirm(`Se reemplazan las parcelas cargadas por estas ${n}. Los relevamientos se conservan. ¿Continuar?`)) return;
+  try{
+    if(db){
+      toast('Subiendo parcelas…');
+      const B = db.ref(cfg.base);
+      await B.child('parcelas').set(out);
+      await B.child('meta/version').set(Date.now());
+    } else {
+      parcelas = out; pVersion = Date.now();
+      await idb.set('parcelas', parcelas); await idb.set('pversion', pVersion);
+      fitted = false; buildLayer(); renderAll(); toast(`${n} parcelas cargadas`);
+    }
+    imp = null; $('#mapeo').hidden = true; $('#fImport').value = '';
+  }catch(e){ toast('Error al publicar: ' + e.message); }
+};
+
+/* ===== Exportación ===== */
+function descargar(nombre, contenido, tipo){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([contenido], {type:tipo})); a.download = nombre;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const hoyStr = () => new Date().toISOString().slice(0, 10);
+$('#btnCSV').onclick = () => {
+  const filas = [['id','manzana','lote','cuenta','padron','titular','direccion','estado_registro','relevamiento','observaciones','relevador','fecha']];
+  for(const id of idsOrdenados()){
+    const p = parcelas[id], r = relev[id];
+    filas.push([id, p.mz, p.pc, p.cta || '', p.pad || '', p.tit || '', p.dir || '', p.reg || '', r ? (ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) : 'Pendiente', r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']);
+  }
+  const csv = '\ufeff' + filas.map(f => f.map(c => { c = String(c ?? ''); return /[";\r\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';')).join('\r\n');
+  descargar(`relevamiento-cloacas-${hoyStr()}.csv`, csv, 'text/csv;charset=utf-8');
+};
+$('#btnGeo').onclick = () => {
+  const features = idsOrdenados().filter(id => parcelas[id].g).map(id => {
+    const p = parcelas[id], r = relev[id];
+    return {type:'Feature', geometry:p.g, properties:{id, manzana:p.mz, parcela:p.pc, cuenta:p.cta || '', direccion:p.dir || '', estado: r ? r.e : 'pendiente', estado_txt: r ? (ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) : 'Pendiente', observaciones: r ? r.o || '' : '', relevador: r ? r.u || '' : '', fecha: r ? new Date(r.t).toISOString() : ''}};
+  });
+  descargar(`relevamiento-cloacas-${hoyStr()}.geojson`, JSON.stringify({type:'FeatureCollection', features}), 'application/geo+json');
+};
+
+/* ===== Mantenimiento ===== */
+$('#btnRecargar').onclick = async () => { await idb.set('pversion', 0); location.reload(); };
+$('#btnBorrarTodo').onclick = async () => {
+  const n = Object.keys(relev).length;
+  if(prompt(`Se borran los ${n} relevamientos${cfg.fb ? ' para TODOS los usuarios' : ''}. Escribí BORRAR para confirmar.`) !== 'BORRAR') return;
+  try{
+    if(db) await db.ref(cfg.base).child('relev').remove();
+    relev = {}; cola = []; saveLocal(); buildLayer(); renderAll(); toast('Relevamientos borrados');
+  }catch(e){ toast('Error: ' + e.message); }
+};
+
+/* ===== Inicio ===== */
+(async function init(){
+  try{
+    parcelas = (await idb.get('parcelas')) || {};
+    relev = (await idb.get('relev')) || {};
+    cola = (await idb.get('cola')) || [];
+    pVersion = (await idb.get('pversion')) || 0;
+    red = (await idb.get('red')) || null;
+    redV = (await idb.get('redv')) || 0;
+  }catch(e){ console.warn('IndexedDB', e); }
+  $('#cfgNombre').value = cfg.nombre || '';
+  $('#cfgBase').value = cfg.base;
+  if(cfg.fb) $('#cfgFb').value = JSON.stringify(cfg.fb, null, 2);
+  updUser(); initMap(); buildRed(); renderAll(); conectarFirebase();
+  if(!cfg.nombre) pedirNombre();
+  window.addEventListener('online', flush);
+  window.addEventListener('beforeunload', e => { if(cola.length){ e.preventDefault(); e.returnValue = ''; } });
+})();
+</script>
+</body>
+</html>
