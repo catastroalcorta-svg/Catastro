@@ -40,6 +40,10 @@ nav button.on{color:var(--pri);font-weight:600}
 .fab{position:absolute;z-index:500;border:0;border-radius:99px;box-shadow:0 3px 10px rgba(0,0,0,.25);background:#fff;color:var(--tx)}
 #btnLoc{right:10px;bottom:96px;width:46px;height:46px;font-size:20px}
 #btnLoc.on{background:#2563eb;color:#fff}
+#btnBoca{right:10px;bottom:150px;padding:11px 14px;font-weight:700;font-size:14px;background:#1e293b;color:#fff}
+.colocar{position:absolute;left:10px;right:10px;bottom:76px;z-index:700;background:#1e293b;color:#fff;border-radius:14px;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-size:14px}
+.colocar .row{margin-top:10px}.colocar .btn{padding:9px 10px;font-size:13px}
+.leaflet-container.poniendo{cursor:crosshair}
 #btnNext{left:50%;transform:translateX(-50%);bottom:16px;padding:13px 20px;background:var(--pri);color:#fff;font-weight:600;font-size:15px;white-space:nowrap}
 .leaflet-bottom.leaflet-right{margin-bottom:6px}
 .empty[hidden]{display:none}
@@ -135,6 +139,11 @@ code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
     <div class="legend" id="legend"></div>
     <div class="modo" id="modo"><button data-m="ter" class="on">Terrenos</button><button data-m="red">Cañería</button></div>
     <button class="fab" id="btnLoc" title="Mi ubicación">📍</button>
+    <button class="fab" id="btnBoca" hidden>＋ Boca</button>
+    <div class="colocar" id="colocar" hidden>
+      <b>Agregar boca de inspección</b><br>Tocá el mapa justo donde está la boca.
+      <div class="row"><button class="btn primary" id="colGPS">Usar mi ubicación</button><button class="btn" id="colCancel">Cancelar</button></div>
+    </div>
     <button class="fab" id="btnNext">Siguiente pendiente cercano ›</button>
     <div class="empty" id="emptyMap" hidden><div>
       <h3 style="margin:0 0 6px">Sin parcelas cargadas</h3>
@@ -249,6 +258,7 @@ code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
     <button class="btn" id="s2Next">Guardar y siguiente ›</button>
   </div>
   <button class="link" id="s2Clear">Quitar relevamiento</button>
+  <button class="link" id="s2Del" style="color:var(--no);margin-left:14px" hidden>Eliminar esta boca</button>
 </div>
 
 <div class="modal" id="mNombre"><div class="card">
@@ -272,7 +282,7 @@ const ESTADOS = {
 const PEND = '#94a3b8';
 const CENTRO = [-33.536, -61.122]; // Alcorta
 const LS_CFG = 'rc_cfg';
-const APP_VERSION = '5 · 12/11/2026 · sin conexiones del plano';
+const APP_VERSION = '6 · 12/11/2026 · agregar bocas';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -302,7 +312,8 @@ let tramos = {}, bocasRel = {};          // relevamiento de red: frenteId -> rec
 let frentes = null, frentesV = 0, frentesById = {}, frentesLayer = null, frentesLy = {};
 let bocasList = [], bocasById = {}, bocasLayer = null, bocasLy = {};
 let modo = 'ter', s2 = null;             // s2 = {k:'t'|'b', id, sel, f:{...}}
-const ST = () => ({relev, tramos, bocas: bocasRel});
+let bocasNuevas = {}, bocasBase = [], colocando = false;   // bocas agregadas en campo: id -> {lat, lng, u, t}
+const ST = () => ({relev, tramos, bocas: bocasRel, bocasN: bocasNuevas});
 const hermanos = id => grupoDe[id] ? grupos[grupoDe[id]] : [id];
 const capaDe = id => layersById[id] || (grupoDe[id] && layersById[grupos[grupoDe[id]][0]]);
 let selId = null, shSel = null, miPos = null, locMarker = null, locCircle = null, locOn = false;
@@ -323,7 +334,7 @@ const idb = (() => {
   return { get: k => tx('readonly', s => s.get(k)), set: (k, v) => tx('readwrite', s => s.put(v, k)) };
 })();
 let saveT;
-function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('tramos', tramos); idb.set('bocas', bocasRel); idb.set('cola', cola); updSync(); }, 250); }
+function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('tramos', tramos); idb.set('bocas', bocasRel); idb.set('bocasN', bocasNuevas); idb.set('cola', cola); updSync(); }, 250); }
 
 /* ===== UI utilitarios ===== */
 let toastT;
@@ -372,6 +383,7 @@ function initMap(){
     } else { locMarker.setLatLng(e.latlng); locCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
     if(first) map.setView(e.latlng, Math.max(map.getZoom(), 18));
   });
+  map.on('click', e => { if(colocando) ponerBoca(e.latlng); });
   map.on('locationerror', e => { toast('No se pudo obtener la ubicación: ' + e.message); locOn = false; $('#btnLoc').classList.remove('on'); });
   buildLayer();
 }
@@ -403,7 +415,7 @@ function buildLayer(){
       let cc = null; try { cc = l.getLatLng ? l.getLatLng() : l.getBounds().getCenter(); } catch(e) {}
       if(cc) hermanos(id).forEach(h => centros[h] = cc);
       // al tocar, abre la primera cuenta pendiente del terreno
-      l.on('click', e => { if(modo === 'red') return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
+      l.on('click', e => { if(modo === 'red') return; if(colocando) return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
     }
   }).addTo(map);
   if(feats.length && !fitted){ try { map.fitBounds(layer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
@@ -419,20 +431,26 @@ const RED_EST = {
   conexion:  {radius:3, color:'#0891b2', weight:0, fillColor:'#0891b2', fillOpacity:.9, interactive:false}
 };
 function tipoRed(t){ t = String(t || '').toLowerCase(); return t.includes('boca') ? 'boca' : t.includes('conex') ? 'conexion' : 'colector'; }
+function armarBocas(){
+  bocasList = bocasBase.map((b, i) => Object.assign(b, {n: i + 1}));
+  const nv = Object.entries(bocasNuevas).filter(([, v]) => v && isFinite(v.lat) && isFinite(v.lng)).sort((a, b) => (a[1].t || 0) - (b[1].t || 0));
+  nv.forEach(([id, v], i) => bocasList.push({id, ll: L.latLng(v.lat, v.lng), n: bocasBase.length + i + 1, nueva: true, por: v.u, cuando: v.t}));
+  bocasById = {}; bocasList.forEach(b => bocasById[b.id] = b);
+  buildBocas();
+}
 function buildRed(){
   if(redLayer){ map.removeLayer(redLayer); ctlLayers.removeLayer(redLayer); redLayer = null; }
-  if(!red || !red.length){ $('#redInfo').textContent = 'Sin capa de red cargada.'; return; }
+  if(!red || !red.length){ $('#redInfo').textContent = 'Sin capa de red cargada.'; bocasBase = []; armarBocas(); return; }
   redLayer = L.geoJSON({type:'FeatureCollection', features: red.filter(x => tipoRed(x.t) !== 'conexion').map(x => ({type:'Feature', properties:{t:x.t}, geometry:x.g}))}, {
     style: f => RED_EST[tipoRed(f.properties.t)],
     pointToLayer: (f, ll) => L.circleMarker(ll, RED_EST[tipoRed(f.properties.t)])
   }).addTo(map);
   ctlLayers.addOverlay(redLayer, 'Red cloacal');
-  bocasList = red.filter(x => tipoRed(x.t) === 'boca' && x.g.type === 'Point').map(x => {
+  bocasBase = red.filter(x => tipoRed(x.t) === 'boca' && x.g.type === 'Point').map(x => {
     const [lng, lat] = x.g.coordinates;
     return {id: 'b' + Math.abs(Math.round(lng * 1e6)) + '_' + Math.abs(Math.round(lat * 1e6)), ll: L.latLng(lat, lng)};
   });
-  bocasById = {}; bocasList.forEach((b, i) => { b.n = i + 1; bocasById[b.id] = b; });
-  buildBocas();
+  armarBocas();
   const c = {boca:0, conexion:0, colector:0}; red.forEach(x => c[tipoRed(x.t)]++);
   $('#redInfo').textContent = `Cargada: ${c.colector} tramos de colector · ${c.boca} bocas de inspección · ${c.conexion} conexiones domiciliarias.`;
   if(!fitted && !Object.keys(centros).length){ try { map.fitBounds(redLayer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
@@ -502,7 +520,7 @@ function buildFrentes(){
   frentes.forEach(f => frentesById[f.id] = f);
   frentesLayer = L.layerGroup(frentes.map(f => {
     const l = L.polyline(f.g.map(c => [c[1], c[0]]), Object.assign({renderer: rendT}, styleT(f.id)));
-    l.on('click', e => { L.DomEvent.stopPropagation(e); abrirRed('t', f.id); });
+    l.on('click', e => { L.DomEvent.stopPropagation(e); if(colocando) return ponerBoca(e.latlng); abrirRed('t', f.id); });
     frentesLy[f.id] = l; return l;
   }));
   const tot = frentes.reduce((a, f) => a + f.m, 0), est = frentes.filter(indicioT).reduce((a, f) => a + f.m, 0);
@@ -515,12 +533,46 @@ function buildBocas(){
   if(!bocasList.length) return;
   bocasLayer = L.layerGroup(bocasList.map(b => {
     const l = L.circleMarker(b.ll, Object.assign({renderer: rendT}, styleB(b.id)));
-    l.on('click', e => { L.DomEvent.stopPropagation(e); abrirRed('b', b.id); });
+    l.on('click', e => { L.DomEvent.stopPropagation(e); if(colocando) return ponerBoca(e.latlng); abrirRed('b', b.id); });
     bocasLy[b.id] = l; return l;
   }));
   aplicarModo();
 }
 const restyleT = id => { const l = frentesLy[id]; if(l) l.setStyle(styleT(id)); };
+function modoColocar(on){
+  colocando = on; $('#colocar').hidden = !on; $('#btnBoca').hidden = on || modo !== 'red'; $('#btnNext').hidden = on;
+  map.getContainer().classList.toggle('poniendo', on);
+}
+$('#btnBoca').onclick = () => {
+  if(!cfg.nombre){ pedirNombre(); return; }
+  cerrarRed(); cerrarSheet(); modoColocar(true);
+};
+$('#colCancel').onclick = () => modoColocar(false);
+$('#colGPS').onclick = () => {
+  if(miPos) return ponerBoca(miPos);
+  toast('Buscando tu ubicación…');
+  navigator.geolocation.getCurrentPosition(p => ponerBoca(L.latLng(p.coords.latitude, p.coords.longitude)),
+    e => toast('No se pudo obtener la ubicación: ' + e.message), {enableHighAccuracy: true, timeout: 15000, maximumAge: 5000});
+};
+function ponerBoca(ll){
+  if(!colocando) return;
+  const cerca = bocasList.find(b => b.ll.distanceTo(ll) < 4);
+  if(cerca && !confirm(`Ya hay una boca (Nº ${cerca.n}) a menos de 4 m. ¿Agregar otra igual?`)) return;
+  const id = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  modoColocar(false);
+  guardar(id, {lat: Math.round(ll.lat * 1e7) / 1e7, lng: Math.round(ll.lng * 1e7) / 1e7, u: cfg.nombre, t: Date.now()}, 'bocasN');
+  const b = bocasById[id];
+  toast(`Boca Nº ${b ? b.n : ''} agregada. Marcá su estado.`);
+  abrirRed('b', id);
+}
+function eliminarBoca(id){
+  const b = bocasById[id]; if(!b || !b.nueva) return;
+  if(!confirm(`¿Eliminar la boca Nº ${b.n}? Se borra para todos.`)) return;
+  cerrarRed();
+  if(bocasRel[id]) guardar(id, null, 'bocas');
+  guardar(id, null, 'bocasN');
+  toast('Boca eliminada');
+}
 const restyleB = id => { const l = bocasLy[id]; if(l) l.setStyle(styleB(id)); };
 function aplicarModo(){
   document.querySelectorAll('#modo button').forEach(b => b.classList.toggle('on', b.dataset.m === modo));
@@ -529,6 +581,8 @@ function aplicarModo(){
   if(layer) layer.setStyle(f => styleFor(f.properties.id));
   if(on){ if(frentesLayer) frentesLayer.eachLayer(l => l.bringToFront()); if(bocasLayer) bocasLayer.eachLayer(l => l.bringToFront()); }
   $('#btnNext').textContent = on ? 'Siguiente cuadra pendiente ›' : 'Siguiente pendiente cercano ›';
+  if(!on && colocando) modoColocar(false);
+  $('#btnBoca').hidden = !on || colocando;
   renderLegend();
 }
 $('#modo').onclick = ev => {
@@ -567,8 +621,8 @@ function abrirRed(k, id){
     restyleT(id);
   } else {
     const b = bocasById[id];
-    $('#s2Title').textContent = `Boca de inspección Nº ${b.n}`;
-    $('#s2Sub').textContent = 'Revisar tapa, que no esté tapada ni obstruida, y medir la profundidad si se puede.';
+    $('#s2Title').textContent = `Boca de inspección Nº ${b.n}` + (b.nueva ? ' (agregada)' : '');
+    $('#s2Sub').textContent = b.nueva ? `Agregada por ${b.por || '¿?'} · ${fmtFecha(b.cuando)}` : 'Revisar tapa, que no esté tapada ni obstruida, y medir la profundidad si se puede.';
     restyleB(id);
   }
   const E = k === 't' ? T_EST : B_EST;
@@ -576,6 +630,8 @@ function abrirRed(k, id){
   pintarS2(r);
   $('#s2Obs').value = r ? (r.o || '') : '';
   $('#s2Clear').style.display = r ? '' : 'none';
+  const bn = k === 'b' && bocasById[id] && bocasById[id].nueva;
+  $('#s2Del').hidden = !bn;
   $('#s2Next').textContent = k === 't' ? 'Guardar y siguiente cuadra ›' : 'Guardar y siguiente boca ›';
   $('#sheet2').classList.add('on'); $('#scrim').classList.add('on');
 }
@@ -626,6 +682,7 @@ $('#s2Next').onclick = () => {
   const sig = sigRed(k, id);
   if(sig) irRed(k, sig); else { cerrarRed(); toast(k === 't' ? 'No quedan cuadras pendientes 🎉' : 'No quedan bocas pendientes 🎉'); }
 };
+$('#s2Del').onclick = () => { if(s2) eliminarBoca(s2.id); };
 $('#s2Clear').onclick = () => {
   if(!s2 || !confirm('¿Quitar este relevamiento? Vuelve a quedar pendiente.')) return;
   guardar(s2.id, null, s2.k === 't' ? 'tramos' : 'bocas'); cerrarRed();
@@ -779,7 +836,7 @@ $('#shClear').onclick = () => {
 
 /* ===== Guardado y sincronización ===== */
 const colDe = q => q.c || 'relev';
-function repintar(c, id){ if(c === 'relev') restyle(id); else if(c === 'tramos') restyleT(id); else restyleB(id); }
+function repintar(c, id){ if(c === 'relev') restyle(id); else if(c === 'tramos') restyleT(id); else if(c === 'bocasN') armarBocas(); else restyleB(id); }
 function guardar(id, rec, c = 'relev'){
   const o = ST()[c];
   if(rec) o[id] = rec; else delete o[id];
@@ -847,7 +904,7 @@ function conectarFirebase(){
       }catch(e){ console.warn('frentes', e); }
     }
   });
-  for(const c of ['relev', 'tramos', 'bocas']){
+  for(const c of ['relev', 'tramos', 'bocas', 'bocasN']){
     const R = B.child(c);
     R.once('value', s => {
       const srv = s.val() || {}, pend = pendientesSet(c), o = ST()[c];
@@ -1166,9 +1223,9 @@ $('#btnCSVred').onclick = () => {
 };
 $('#btnCSVbi').onclick = () => {
   if(!bocasList.length) return toast('No hay bocas cargadas');
-  const filas = [['boca','latitud','longitud','estado','profundidad_m','observaciones','relevador','fecha']];
+  const filas = [['boca','origen','agregada_por','latitud','longitud','estado','profundidad_m','observaciones','relevador','fecha']];
   for(const b of bocasList){ const r = bocasRel[b.id];
-    filas.push([b.n, num2(b.ll.lat.toFixed(6)), num2(b.ll.lng.toFixed(6)), r ? B_EST[r.e].t : 'Pendiente', num2(r && r.prof || ''), r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']); }
+    filas.push([b.n, b.nueva ? 'Agregada en campo' : 'Plano', b.nueva ? b.por || '' : '', num2(b.ll.lat.toFixed(6)), num2(b.ll.lng.toFixed(6)), r ? B_EST[r.e].t : 'Pendiente', num2(r && r.prof || ''), r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']); }
   descargar(`bocas-inspeccion-${hoyStr()}.csv`, aCSV(filas), 'text/csv;charset=utf-8');
 };
 $('#btnGeoRed').onclick = () => {
@@ -1177,7 +1234,7 @@ $('#btnGeoRed').onclick = () => {
     return {type:'Feature', geometry:{type:'LineString', coordinates:f.g}, properties:{cuadra:f.id, manzana:f.mz, calle:f.calle, largo_m:largoT(f.id), estado: r ? r.e : 'pendiente', estado_txt: r ? T_EST[r.e].t : 'Pendiente',
       diametro: r && r.diam || '', material: r && r.mat ? T_TXT.mat[r.mat] : '', conservacion: r && r.cons ? T_TXT.cons[r.cons] : '', profundidad_m: r && r.prof || '', observaciones: r ? r.o || '' : '', relevador: r ? r.u || '' : '', fecha: r ? new Date(r.t).toISOString() : ''}}; })
     .concat(bocasList.map(b => { const r = bocasRel[b.id];
-      return {type:'Feature', geometry:{type:'Point', coordinates:[b.ll.lng, b.ll.lat]}, properties:{boca:b.n, estado: r ? r.e : 'pendiente', estado_txt: r ? B_EST[r.e].t : 'Pendiente', profundidad_m: r && r.prof || '', observaciones: r ? r.o || '' : ''}}; }));
+      return {type:'Feature', geometry:{type:'Point', coordinates:[b.ll.lng, b.ll.lat]}, properties:{boca:b.n, origen: b.nueva ? 'agregada' : 'plano', estado: r ? r.e : 'pendiente', estado_txt: r ? B_EST[r.e].t : 'Pendiente', profundidad_m: r && r.prof || '', observaciones: r ? r.o || '' : ''}}; }));
   descargar(`red-cloacal-relevada-${hoyStr()}.geojson`, JSON.stringify({type:'FeatureCollection', features}), 'application/geo+json');
 };
 $('#btnGeo').onclick = () => {
@@ -1194,9 +1251,9 @@ $('#btnBorrarTodo').onclick = async () => {
   const n = Object.keys(relev).length + Object.keys(tramos).length + Object.keys(bocasRel).length;
   if(prompt(`Se borran los ${n} relevamientos (terrenos, cuadras y bocas)${cfg.fb ? ' para TODOS los usuarios' : ''}. Escribí BORRAR para confirmar.`) !== 'BORRAR') return;
   try{
-    if(db) for(const c of ['relev', 'tramos', 'bocas']) await db.ref(cfg.base).child(c).remove();
-    for(const o of [relev, tramos, bocasRel]) for(const k in o) delete o[k];
-    cola = []; saveLocal(); buildLayer(); buildFrentes(); buildBocas(); renderAll(); toast('Relevamientos borrados');
+    if(db) for(const c of ['relev', 'tramos', 'bocas', 'bocasN']) await db.ref(cfg.base).child(c).remove();
+    for(const o of [relev, tramos, bocasRel, bocasNuevas]) for(const k in o) delete o[k];
+    cola = []; saveLocal(); buildLayer(); buildFrentes(); armarBocas(); renderAll(); toast('Relevamientos borrados');
   }catch(e){ toast('Error: ' + e.message); }
 };
 
@@ -1211,6 +1268,7 @@ $('#btnBorrarTodo').onclick = async () => {
     redV = (await idb.get('redv')) || 0;
     tramos = (await idb.get('tramos')) || {};
     bocasRel = (await idb.get('bocas')) || {};
+    bocasNuevas = (await idb.get('bocasN')) || {};
     frentes = (await idb.get('frentes')) || null;
     frentesV = (await idb.get('frentesv')) || 0;
   }catch(e){ console.warn('IndexedDB', e); }
