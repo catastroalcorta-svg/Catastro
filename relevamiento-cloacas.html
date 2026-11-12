@@ -34,7 +34,7 @@ nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav) + env(safe-are
 nav button{flex:1;border:0;background:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px}
 nav button span{font-size:21px;line-height:1}
 nav button.on{color:var(--pri);font-weight:600}
-.legend{position:absolute;top:10px;left:10px;z-index:500;background:rgba(255,255,255,.95);border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.6}
+.legend{position:absolute;top:58px;left:10px;z-index:500;background:rgba(255,255,255,.95);border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.6}
 .legend b{font-variant-numeric:tabular-nums}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
 .fab{position:absolute;z-index:500;border:0;border-radius:99px;box-shadow:0 3px 10px rgba(0,0,0,.25);background:#fff;color:var(--tx)}
@@ -104,6 +104,21 @@ td.n{text-align:right;font-variant-numeric:tabular-nums}
 .toast{position:fixed;left:50%;bottom:calc(var(--nav) + 20px);transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:3000;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.on{opacity:1;transform:translateX(-50%)}
 .hint{font-size:12px;color:var(--mut);margin-top:6px}
+.modo{position:absolute;top:10px;left:10px;z-index:500;display:flex;background:#fff;border-radius:99px;box-shadow:0 2px 8px rgba(0,0,0,.18);padding:3px}
+.modo button{border:0;background:none;padding:8px 12px;border-radius:99px;font-size:13px;font-weight:600;color:var(--mut)}
+.modo button.on{background:var(--pri);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.chip{border:1.5px solid var(--bd);background:#fff;border-radius:99px;padding:7px 11px;font-size:13px}
+.chip.sel{border-color:var(--pri);background:#e6f0f2;color:var(--pri);font-weight:600}
+.fl{font-size:12px;color:var(--mut);margin:10px 0 2px;font-weight:600}
+.estados.e3{grid-template-columns:1fr 1fr 1fr}
+.estados.e3 .est{min-height:64px;padding:10px 8px}
+details.mas{margin:6px 0 4px;border:1px solid var(--bd);border-radius:12px;padding:4px 12px 10px}
+details.mas summary{font-size:13px;font-weight:600;color:var(--pri);padding:8px 0;cursor:pointer}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.kpi{background:#f8fafc;border-radius:10px;padding:10px}
+.kpi b{display:block;font-size:22px;color:var(--pri);font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--mut)}
 code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
 </style>
 </head>
@@ -118,6 +133,7 @@ code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
   <section class="view on" id="vMapa">
     <div id="map"></div>
     <div class="legend" id="legend"></div>
+    <div class="modo" id="modo"><button data-m="ter" class="on">Terrenos</button><button data-m="red">Cañería</button></div>
     <button class="fab" id="btnLoc" title="Mi ubicación">📍</button>
     <button class="fab" id="btnNext">Siguiente pendiente cercano ›</button>
     <div class="empty" id="emptyMap" hidden><div>
@@ -172,9 +188,17 @@ code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
     </div>
 
     <div class="card">
+      <h3>Cuadras para relevar cañería</h3>
+      <p>Archivo <code>frentes-cuadra.json</code>: cada lado de manzana con su largo en metros. Sobre esto se marca dónde hay cañería y se suman los metros reales.</p>
+      <input type="file" id="fFrentes" accept=".json,.geojson">
+      <div class="hint" id="frentesInfo"></div>
+    </div>
+
+    <div class="card">
       <h3>Exportar</h3>
-      <p>Para cargar el resultado en el Catastro o armar el informe.</p>
-      <div class="row"><button class="btn" id="btnCSV">CSV (Excel)</button><button class="btn" id="btnGeo">GeoJSON</button></div>
+      <p>Para cargar el resultado en el Catastro o armar el informe ENRESS.</p>
+      <div class="row"><button class="btn" id="btnCSV">Terrenos CSV</button><button class="btn" id="btnGeo">Terrenos GeoJSON</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="btnCSVred">Cañería CSV</button><button class="btn" id="btnCSVbi">Bocas CSV</button><button class="btn" id="btnGeoRed">Cañería GeoJSON</button></div>
     </div>
 
     <div class="card">
@@ -201,12 +225,29 @@ code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
   <div class="cur" id="shCur"></div>
   <div id="shOtros" style="font-size:13px;color:var(--mut)"></div>
   <div class="estados" id="shEstados"></div>
+  <details class="mas" id="shMas"><summary>Más datos del terreno (opcional)</summary><div id="shExtra"></div></details>
   <textarea id="shObs" placeholder="Observaciones (opcional): cámara, pozo, vecino informó…"></textarea>
   <div class="row" style="margin-top:10px">
     <button class="btn primary" id="shSave">Guardar</button>
     <button class="btn" id="shNext">Guardar y siguiente ›</button>
   </div>
   <button class="link" id="shClear">Quitar relevamiento de este terreno</button>
+</div>
+
+<div class="sheet" id="sheet2">
+  <div class="grab"></div>
+  <div class="sh-head">
+    <div><h2 id="s2Title"></h2><p id="s2Sub"></p></div>
+    <button class="x" id="s2Close" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="cur" id="s2Cur"></div>
+  <div id="s2Body"></div>
+  <textarea id="s2Obs" placeholder="Observaciones (opcional)"></textarea>
+  <div class="row" style="margin-top:10px">
+    <button class="btn primary" id="s2Save">Guardar</button>
+    <button class="btn" id="s2Next">Guardar y siguiente ›</button>
+  </div>
+  <button class="link" id="s2Clear">Quitar relevamiento</button>
 </div>
 
 <div class="modal" id="mNombre"><div class="card">
@@ -255,6 +296,11 @@ let db = null, online = false, flushing = false;
 let map, layer, layersById = {}, centros = {}, fitted = false;
 let red = null, redV = 0, redLayer = null, ctlLayers = null;
 let grupos = {}, grupoDe = {};
+let tramos = {}, bocasRel = {};          // relevamiento de red: frenteId -> rec, bocaId -> rec
+let frentes = null, frentesV = 0, frentesById = {}, frentesLayer = null, frentesLy = {};
+let bocasList = [], bocasById = {}, bocasLayer = null, bocasLy = {};
+let modo = 'ter', s2 = null;             // s2 = {k:'t'|'b', id, sel, f:{...}}
+const ST = () => ({relev, tramos, bocas: bocasRel});
 const hermanos = id => grupoDe[id] ? grupos[grupoDe[id]] : [id];
 const capaDe = id => layersById[id] || (grupoDe[id] && layersById[grupos[grupoDe[id]][0]]);
 let selId = null, shSel = null, miPos = null, locMarker = null, locCircle = null, locOn = false;
@@ -275,7 +321,7 @@ const idb = (() => {
   return { get: k => tx('readonly', s => s.get(k)), set: (k, v) => tx('readwrite', s => s.put(v, k)) };
 })();
 let saveT;
-function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('cola', cola); updSync(); }, 250); }
+function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('tramos', tramos); idb.set('bocas', bocasRel); idb.set('cola', cola); updSync(); }, 250); }
 
 /* ===== UI utilitarios ===== */
 let toastT;
@@ -332,6 +378,7 @@ function styleFor(id){
   const hs = hermanos(id), pend = hs.find(h => !relev[h]);
   const ref = hs.length > 1 ? (pend !== undefined ? pend : hs[0]) : id;
   const r = relev[ref], c = colorDe(ref), sel = hs.includes(selId);
+  if(modo === 'red') return {color:'#cbd5e1', weight:.6, fillColor:c, fillOpacity: r ? .12 : .04, opacity:1};
   return {color: sel ? '#0f172a' : c, weight: sel ? 3.5 : 1.2, fillColor:c, fillOpacity: r ? .55 : .22, opacity:1};
 }
 function restyle(id){ const l = capaDe(id); if(l && l.setStyle) l.setStyle(styleFor(hermanos(id)[0])); }
@@ -354,11 +401,13 @@ function buildLayer(){
       let cc = null; try { cc = l.getLatLng ? l.getLatLng() : l.getBounds().getCenter(); } catch(e) {}
       if(cc) hermanos(id).forEach(h => centros[h] = cc);
       // al tocar, abre la primera cuenta pendiente del terreno
-      l.on('click', e => { L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
+      l.on('click', e => { if(modo === 'red') return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
     }
   }).addTo(map);
   if(feats.length && !fitted){ try { map.fitBounds(layer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
   if(redLayer) redLayer.bringToFront();
+  if(frentesLayer && map.hasLayer(frentesLayer)) frentesLayer.bringToFront();
+  if(bocasLayer && map.hasLayer(bocasLayer)) bocasLayer.bringToFront();
   $('#emptyMap').hidden = Object.keys(parcelas).length > 0 || !!red;
 }
 /* Capa de red cloacal: solo referencia, no interactiva (los toques pasan a las parcelas) */
@@ -376,6 +425,12 @@ function buildRed(){
     pointToLayer: (f, ll) => L.circleMarker(ll, RED_EST[tipoRed(f.properties.t)])
   }).addTo(map);
   ctlLayers.addOverlay(redLayer, 'Red cloacal');
+  bocasList = red.filter(x => tipoRed(x.t) === 'boca' && x.g.type === 'Point').map(x => {
+    const [lng, lat] = x.g.coordinates;
+    return {id: 'b' + Math.abs(Math.round(lng * 1e6)) + '_' + Math.abs(Math.round(lat * 1e6)), ll: L.latLng(lat, lng)};
+  });
+  bocasById = {}; bocasList.forEach((b, i) => { b.n = i + 1; bocasById[b.id] = b; });
+  buildBocas();
   const c = {boca:0, conexion:0, colector:0}; red.forEach(x => c[tipoRed(x.t)]++);
   $('#redInfo').textContent = `Cargada: ${c.colector} tramos de colector · ${c.boca} bocas de inspección · ${c.conexion} conexiones domiciliarias.`;
   if(!fitted && !Object.keys(centros).length){ try { map.fitBounds(redLayer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
@@ -398,8 +453,200 @@ $('#fRed').onchange = async ev => {
   }catch(e){ toast('No pude cargar la red: ' + e.message); }
   ev.target.value = '';
 };
+/* ===== Red: cuadras (frentes de manzana) y bocas de inspección ===== */
+const T_EST = {
+  si:  {t:'Hay cañería',   d:'Colector a lo largo de esta cuadra', c:'#16a34a'},
+  no:  {t:'No hay',        d:'Sin cañería en esta cuadra',        c:'#dc2626'},
+  dud: {t:'No verificado', d:'No se pudo constatar',              c:'#7c3aed'}
+};
+const B_EST = {
+  ok:  {t:'Buen estado',        c:'#16a34a'},
+  tapa:{t:'Tapa rota / falta',  c:'#f59e0b'},
+  ent: {t:'Tapada / enterrada', c:'#a16207'},
+  obs: {t:'Obstruida / desborda', c:'#dc2626'},
+  noe: {t:'No encontrada',      c:'#7c3aed'}
+};
+const T_CAMPOS = [
+  ['diam', 'Diámetro', [['110','110 mm'],['160','160 mm'],['200','200 mm'],['250','250 mm'],['315','315 mm'],['ns','No sé']]],
+  ['mat',  'Material', [['pvc','PVC'],['ac','Asbesto cemento'],['ho','Hormigón'],['gres','Gres/cerámico'],['ns','No sé']]],
+  ['ubi',  'Ubicación', [['ver','Vereda'],['cal','Calzada'],['ns','No sé']]],
+  ['cons', 'Estado', [['b','Bueno'],['r','Regular'],['m','Malo / obstruido']]]
+];
+const T_TXT = Object.fromEntries(T_CAMPOS.map(([k,, o]) => [k, Object.fromEntries(o)]));
+const P_CAMPOS = [
+  ['uso',  'Uso', [['viv','Vivienda'],['com','Comercio'],['bal','Baldío'],['ins','Institución'],['ind','Industria / taller']]],
+  ['pozo', '¿Usa pozo negro o cámara séptica?', [['si','Sí'],['no','No'],['ns','No sé']]],
+  ['pluv', '¿Desagüe pluvial conectado a la cloaca?', [['si','Sí'],['no','No'],['ns','No sé']]],
+  ['cam',  '¿Cámara de inspección domiciliaria visible?', [['si','Sí'],['no','No']]]
+];
+const P_TXT = Object.fromEntries(P_CAMPOS.map(([k,, o]) => [k, Object.fromEntries(o)]));
+const largoT = id => { const r = tramos[id], f = frentesById[id]; return (r && +r.lm > 0) ? +r.lm : (f ? f.m : 0); };
+const indicioT = f => f.cad > 0 || f.bi > 0;
+function colorT(id){ const r = tramos[id]; return r && T_EST[r.e] ? T_EST[r.e].c : PEND; }
+function styleT(id){
+  const r = tramos[id], f = frentesById[id], sel = s2 && s2.k === 't' && s2.id === id;
+  if(r) return {color: sel ? '#0f172a' : colorT(id), weight: sel ? 9 : 6, opacity: .95, dashArray: null, lineCap:'round'};
+  return {color: sel ? '#0f172a' : (indicioT(f) ? '#64748b' : '#94a3b8'), weight: sel ? 9 : 5, opacity: indicioT(f) ? .9 : .6, dashArray: indicioT(f) ? null : '6 7', lineCap:'round'};
+}
+function styleB(id){
+  const r = bocasRel[id], sel = s2 && s2.k === 'b' && s2.id === id;
+  return {radius: sel ? 10 : 8, color: sel ? '#0f172a' : '#fff', weight: sel ? 3 : 2, fillColor: r && B_EST[r.e] ? B_EST[r.e].c : '#1e293b', fillOpacity: 1};
+}
+const rendT = L.canvas({tolerance: 10, padding: .3});
+function buildFrentes(){
+  if(frentesLayer){ map.removeLayer(frentesLayer); frentesLayer = null; }
+  frentesById = {}; frentesLy = {};
+  if(!frentes || !frentes.length){ $('#frentesInfo').textContent = 'Sin cuadras cargadas.'; return; }
+  frentes.forEach(f => frentesById[f.id] = f);
+  frentesLayer = L.layerGroup(frentes.map(f => {
+    const l = L.polyline(f.g.map(c => [c[1], c[0]]), Object.assign({renderer: rendT}, styleT(f.id)));
+    l.on('click', e => { L.DomEvent.stopPropagation(e); abrirRed('t', f.id); });
+    frentesLy[f.id] = l; return l;
+  }));
+  const tot = frentes.reduce((a, f) => a + f.m, 0), est = frentes.filter(indicioT).reduce((a, f) => a + f.m, 0);
+  $('#frentesInfo').textContent = `Cargadas: ${frentes.length} cuadras · ${Math.round(tot).toLocaleString('es-AR')} m de frentes · ${Math.round(est).toLocaleString('es-AR')} m con indicios de cañería en el plano.`;
+  aplicarModo();
+}
+function buildBocas(){
+  if(bocasLayer){ map.removeLayer(bocasLayer); bocasLayer = null; }
+  bocasLy = {};
+  if(!bocasList.length) return;
+  bocasLayer = L.layerGroup(bocasList.map(b => {
+    const l = L.circleMarker(b.ll, Object.assign({renderer: rendT}, styleB(b.id)));
+    l.on('click', e => { L.DomEvent.stopPropagation(e); abrirRed('b', b.id); });
+    bocasLy[b.id] = l; return l;
+  }));
+  aplicarModo();
+}
+const restyleT = id => { const l = frentesLy[id]; if(l) l.setStyle(styleT(id)); };
+const restyleB = id => { const l = bocasLy[id]; if(l) l.setStyle(styleB(id)); };
+function aplicarModo(){
+  document.querySelectorAll('#modo button').forEach(b => b.classList.toggle('on', b.dataset.m === modo));
+  const on = modo === 'red';
+  for(const ly of [frentesLayer, bocasLayer]) if(ly){ if(on && !map.hasLayer(ly)) ly.addTo(map); if(!on && map.hasLayer(ly)) map.removeLayer(ly); }
+  if(layer) layer.setStyle(f => styleFor(f.properties.id));
+  if(on){ if(frentesLayer) frentesLayer.eachLayer(l => l.bringToFront()); if(bocasLayer) bocasLayer.eachLayer(l => l.bringToFront()); }
+  $('#btnNext').textContent = on ? 'Siguiente cuadra pendiente ›' : 'Siguiente pendiente cercano ›';
+  renderLegend();
+}
+$('#modo').onclick = ev => {
+  const b = ev.target.closest('button'); if(!b || b.dataset.m === modo) return;
+  if(b.dataset.m === 'red' && !frentesLayer && !bocasLayer){ toast('Primero cargá las cuadras en Ajustes'); return; }
+  cerrarSheet(); cerrarRed(); modo = b.dataset.m; try{ localStorage.setItem('rc_modo', modo); }catch(e){} aplicarModo();
+};
+function centroT(id){ const f = frentesById[id]; const c = f.g[Math.floor(f.g.length / 2)], a = f.g[0]; return L.latLng((c[1] + a[1]) / 2, (c[0] + a[0]) / 2); }
+function sigRed(k, excluir){
+  const ref = miPos || (excluir && (k === 't' ? frentesById[excluir] && centroT(excluir) : bocasById[excluir] && bocasById[excluir].ll)) || map.getCenter();
+  let best = null, bd = Infinity;
+  if(k === 't'){ for(const f of frentes || []){ if(f.id === excluir || tramos[f.id]) continue; const d = ref.distanceTo(centroT(f.id)) - (indicioT(f) ? 40 : 0); if(d < bd){ bd = d; best = f.id; } } }
+  else { for(const b of bocasList){ if(b.id === excluir || bocasRel[b.id]) continue; const d = ref.distanceTo(b.ll); if(d < bd){ bd = d; best = b.id; } } }
+  return best;
+}
+function irRed(k, id){
+  if(vistaActual() !== 'vMapa') irVista('vMapa');
+  if(modo !== 'red'){ modo = 'red'; aplicarModo(); }
+  if(k === 't'){ const l = frentesLy[id]; if(l) map.fitBounds(l.getBounds(), {maxZoom:19, padding:[80,80]}); }
+  else if(bocasById[id]) map.setView(bocasById[id].ll, Math.max(map.getZoom(), 19));
+  abrirRed(k, id);
+}
+const chipsHTML = (k, lbl, ops, val) => `<div class="fl">${lbl}</div><div class="chips" data-k="${k}">` +
+  ops.map(([v, t]) => `<button class="chip${val === v ? ' sel' : ''}" data-v="${v}">${t}</button>`).join('') + '</div>';
+function abrirRed(k, id){
+  cerrarSheet();
+  const prev = s2; s2 = {k, id, sel: null, f: {}};
+  if(prev){ prev.k === 't' ? restyleT(prev.id) : restyleB(prev.id); }
+  const r = (k === 't' ? tramos : bocasRel)[id];
+  s2.sel = r ? r.e : null;
+  if(r) for(const x of ['diam','mat','ubi','cons']) if(r[x]) s2.f[x] = r[x];
+  if(k === 't'){
+    const f = frentesById[id];
+    $('#s2Title').textContent = `Cuadra Mz ${f.mz}` + (f.calle ? ` · ${f.calle}` : '');
+    $('#s2Sub').textContent = `Largo calculado: ${f.m.toLocaleString('es-AR')} m` + (f.cad ? ` · ${f.cad} conexiones en el plano` : '') + (f.bi ? ` · ${f.bi} boca(s) de inspección` : '') + (!indicioT(f) ? ' · sin indicios en el plano' : '');
+    restyleT(id);
+  } else {
+    const b = bocasById[id];
+    $('#s2Title').textContent = `Boca de inspección Nº ${b.n}`;
+    $('#s2Sub').textContent = 'Revisar tapa, que no esté tapada ni obstruida, y medir la profundidad si se puede.';
+    restyleB(id);
+  }
+  const E = k === 't' ? T_EST : B_EST;
+  $('#s2Cur').innerHTML = r ? `Actual: <b style="color:${E[r.e] ? E[r.e].c : PEND}">${esc(E[r.e] ? E[r.e].t : r.e)}</b> · ${esc(r.u || '')} · ${fmtFecha(r.t)}` : 'Sin relevar todavía.';
+  pintarS2(r);
+  $('#s2Obs').value = r ? (r.o || '') : '';
+  $('#s2Clear').style.display = r ? '' : 'none';
+  $('#s2Next').textContent = k === 't' ? 'Guardar y siguiente cuadra ›' : 'Guardar y siguiente boca ›';
+  $('#sheet2').classList.add('on'); $('#scrim').classList.add('on');
+}
+function pintarS2(r){
+  const k = s2.k, E = k === 't' ? T_EST : B_EST;
+  let h = `<div class="estados ${k === 't' ? 'e3' : ''}">` + Object.entries(E).map(([v, e]) =>
+    `<button class="est${s2.sel === v ? ' sel' : ''}" data-e="${v}" style="--c:${e.c}"><b><span class="dot" style="background:${e.c}"></span>${e.t}</b>${e.d ? `<small>${e.d}</small>` : ''}</button>`).join('') + '</div>';
+  if(k === 't'){
+    h += `<div id="s2Det" ${s2.sel === 'si' ? '' : 'hidden'}>` + T_CAMPOS.map(([c, l, o]) => chipsHTML(c, l, o, s2.f[c])).join('') +
+      `<div class="grid2" style="margin-top:6px"><div><div class="fl">Largo medido (m)</div><input id="s2Lm" type="number" inputmode="decimal" step="0.1" placeholder="${frentesById[s2.id].m}" value="${r && r.lm ? r.lm : ''}"></div>` +
+      `<div><div class="fl">Profundidad aprox. (m)</div><input id="s2Prof" type="number" inputmode="decimal" step="0.05" value="${r && r.prof ? r.prof : ''}"></div></div></div>`;
+  } else {
+    h += `<div class="fl">Profundidad (m)</div><input id="s2Prof" type="number" inputmode="decimal" step="0.05" value="${r && r.prof ? r.prof : ''}">`;
+  }
+  $('#s2Body').innerHTML = h;
+}
+$('#s2Body').onclick = ev => {
+  const e = ev.target.closest('.est');
+  if(e){ s2.sel = e.dataset.e; document.querySelectorAll('#s2Body .est').forEach(b => b.classList.toggle('sel', b === e)); const d = $('#s2Det'); if(d) d.hidden = s2.sel !== 'si'; return; }
+  const c = ev.target.closest('.chip'); if(!c) return;
+  const k = c.parentElement.dataset.k, v = c.dataset.v;
+  s2.f[k] = s2.f[k] === v ? undefined : v;
+  c.parentElement.querySelectorAll('.chip').forEach(b => b.classList.toggle('sel', b.dataset.v === s2.f[k]));
+};
+function cerrarRed(){
+  $('#sheet2').classList.remove('on'); $('#scrim').classList.remove('on');
+  const prev = s2; s2 = null; if(prev){ prev.k === 't' ? restyleT(prev.id) : restyleB(prev.id); }
+}
+$('#s2Close').onclick = cerrarRed;
+function guardarRed(){
+  if(!s2) return false;
+  if(!s2.sel){ toast('Elegí un estado'); return false; }
+  if(!cfg.nombre){ pedirNombre(); return false; }
+  const rec = {e: s2.sel, o: $('#s2Obs').value.trim(), u: cfg.nombre, t: Date.now()};
+  const num = sel => { const el = $(sel); const v = el ? parseFloat(String(el.value).replace(',', '.')) : NaN; return isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null; };
+  const prof = num('#s2Prof'); if(prof) rec.prof = prof;
+  if(s2.k === 't' && s2.sel === 'si'){
+    for(const x of ['diam','mat','ubi','cons']) if(s2.f[x]) rec[x] = s2.f[x];
+    const lm = num('#s2Lm'); if(lm) rec.lm = lm;
+  }
+  guardar(s2.id, rec, s2.k === 't' ? 'tramos' : 'bocas');
+  toast(s2.k === 't' ? `Cuadra Mz ${frentesById[s2.id].mz}: ${T_EST[rec.e].t}` : `Boca Nº ${bocasById[s2.id].n}: ${B_EST[rec.e].t}`);
+  return true;
+}
+$('#s2Save').onclick = () => { if(guardarRed()) cerrarRed(); };
+$('#s2Next').onclick = () => {
+  const {k, id} = s2 || {}; if(!guardarRed()) return;
+  const sig = sigRed(k, id);
+  if(sig) irRed(k, sig); else { cerrarRed(); toast(k === 't' ? 'No quedan cuadras pendientes 🎉' : 'No quedan bocas pendientes 🎉'); }
+};
+$('#s2Clear').onclick = () => {
+  if(!s2 || !confirm('¿Quitar este relevamiento? Vuelve a quedar pendiente.')) return;
+  guardar(s2.id, null, s2.k === 't' ? 'tramos' : 'bocas'); cerrarRed();
+};
+$('#fFrentes').onchange = async ev => {
+  const file = ev.target.files[0]; if(!file) return;
+  try{
+    let arr = JSON.parse(await file.text());
+    if(arr && arr.features) arr = arr.features.filter(f => f.geometry && f.geometry.type === 'LineString').map(f => Object.assign({}, f.properties, {g: f.geometry.coordinates}));
+    if(!Array.isArray(arr) || !arr.length || !arr[0].id || !arr[0].g) throw new Error('No es un archivo de cuadras');
+    arr = arr.map(f => ({id: fbKey(f.id), mz: String(f.mz || ''), calle: f.calle || '', m: +f.m || 0, cad: +f.cad || 0, bi: +f.bi || 0, g: f.g}));
+    if(!confirm(`Publicar ${arr.length} cuadras${db ? ' para todos' : ''}? Lo ya relevado se conserva.`)) return;
+    const v = Date.now();
+    if(db) await db.ref(cfg.base).child('frentes').set({v, f: arr});
+    else { frentes = arr; frentesV = v; await idb.set('frentes', arr); await idb.set('frentesv', v); buildFrentes(); }
+    toast('Cuadras publicadas');
+  }catch(e){ toast('No pude cargar las cuadras: ' + e.message); }
+  ev.target.value = '';
+};
+
 function irA(id){
   const l = capaDe(id);
+  if(modo === 'red'){ modo = 'ter'; aplicarModo(); }
   if(l){
     if(vistaActual() !== 'vMapa') irVista('vMapa');
     if(l.getLatLng) map.setView(l.getLatLng(), Math.max(map.getZoom(), 19));
@@ -429,6 +676,7 @@ function siguientePendiente(excluir){
   return best;
 }
 $('#btnNext').onclick = () => {
+  if(modo === 'red'){ const t = sigRed('t', s2 && s2.k === 't' ? s2.id : null); if(t) irRed('t', t); else toast('No quedan cuadras pendientes 🎉'); return; }
   const id = siguientePendiente(selId);
   if(id) irA(id); else toast('No quedan terrenos pendientes en el mapa 🎉');
 };
@@ -440,6 +688,17 @@ function contar(){
   return c;
 }
 function renderLegend(){
+  if(modo === 'red'){
+    const m = {si:0, no:0, dud:0}; let pend = 0;
+    for(const f of frentes || []){ const r = tramos[f.id]; if(r && m[r.e] !== undefined) m[r.e] += largoT(f.id); else pend += f.m; }
+    const km = x => Math.round(x).toLocaleString('es-AR') + ' m';
+    const nb = Object.keys(bocasRel).length;
+    $('#legend').innerHTML = Object.entries(T_EST).map(([k, e]) => `<div><span style="display:inline-block;width:14px;height:4px;background:${e.c};vertical-align:3px;margin-right:6px"></span>${e.t} <b>${km(m[k])}</b></div>`).join('')
+      + `<div><span style="display:inline-block;width:14px;height:4px;background:#64748b;vertical-align:3px;margin-right:6px"></span>Pendiente <b>${km(pend)}</b></div>`
+      + `<div style="color:var(--mut);font-size:11px">Gris lleno: hay indicios en el plano</div>`
+      + (bocasList.length ? `<div style="border-top:1px solid var(--bd);margin-top:4px;padding-top:4px"><span class="dot" style="background:#1e293b"></span>Bocas relevadas <b>${nb}/${bocasList.length}</b></div>` : '');
+    return;
+  }
   const c = contar();
   $('#legend').innerHTML = Object.entries(ESTADOS).map(([k,e]) => `<div><span class="dot" style="background:${e.c}"></span>${e.t} <b>${c[k]}</b></div>`).join('')
     + `<div><span class="dot" style="background:${PEND}"></span>Pendiente <b>${c.pend}</b></div>`
@@ -454,17 +713,30 @@ $('#shEstados').onclick = ev => {
   const b = ev.target.closest('.est'); if(!b) return;
   shSel = b.dataset.e; marcarSel();
 };
-function marcarSel(){ document.querySelectorAll('.est').forEach(b => b.classList.toggle('sel', b.dataset.e === shSel)); }
+let shF = {};
+$('#shExtra').onclick = ev => {
+  const c = ev.target.closest('.chip'); if(!c) return;
+  const k = c.parentElement.dataset.k, v = c.dataset.v;
+  shF[k] = shF[k] === v ? undefined : v;
+  c.parentElement.querySelectorAll('.chip').forEach(b => b.classList.toggle('sel', b.dataset.v === shF[k]));
+};
+function marcarSel(){ document.querySelectorAll('#shEstados .est').forEach(b => b.classList.toggle('sel', b.dataset.e === shSel)); }
 function abrirSheet(id){
+  if(s2) cerrarRed();
   const prev = selId; selId = id; if(prev) restyle(prev); restyle(id);
   const p = parcelas[id] || {}, r = relev[id];
   $('#shTitle').textContent = titulo(id);
-  $('#shSub').textContent = [p.tit, p.dir, p.cta ? 'Cta. ' + p.cta : '', p.pad ? 'Padrón ' + p.pad : '', p.reg ? 'Registro: ' + p.reg : ''].filter(Boolean).join(' · ') || 'ID ' + id;
+  $('#shSub').textContent = [p.tit, p.dir, p.cta ? 'Cta. ' + p.cta : '', p.pad ? 'Padrón ' + p.pad : '', p.reg ? 'Registro: ' + p.reg : '',
+    p.cc ? 'Cta. cloaca ' + p.cc : '', p.dc ? 'Ø catastro ' + p.dc : '', p.cp ? 'Conexión en plano: ' + p.cp : ''].filter(Boolean).join(' · ') || 'ID ' + id;
   pintarCur(id);
   const otros = hermanos(id).filter(h => h !== id);
   $('#shOtros').innerHTML = otros.length ? `Otras cuentas en este terreno: ` + otros.map(h =>
     `<button class="btn" style="padding:5px 9px;margin:3px 4px 0 0;font-size:12px" onclick="abrirSheet('${esc(h)}')"><span class="dot" style="background:${colorDe(h)};margin-right:4px"></span>Cta. ${esc(parcelas[h].cta || h)}</button>`).join('') : '';
   shSel = r ? r.e : null; marcarSel();
+  shF = {}; if(r) for(const [k] of P_CAMPOS) if(r[k]) shF[k] = r[k];
+  $('#shExtra').innerHTML = P_CAMPOS.map(([k, l, o]) => chipsHTML(k, l, o, shF[k])).join('') +
+    `<div class="fl">Personas que viven (aprox.)</div><input id="shHab" type="number" inputmode="numeric" min="0" value="${r && r.hab ? r.hab : ''}">`;
+  $('#shMas').open = !!(r && (Object.keys(shF).length || r.hab));
   $('#shObs').value = r ? (r.o || '') : '';
   $('#shClear').style.display = r ? '' : 'none';
   $('#sheet').classList.add('on'); $('#scrim').classList.add('on');
@@ -476,15 +748,18 @@ function pintarCur(id){
     : 'Sin relevar todavía.';
 }
 function cerrarSheet(){
-  $('#sheet').classList.remove('on'); $('#scrim').classList.remove('on');
+  $('#sheet').classList.remove('on'); if(!s2) $('#scrim').classList.remove('on');
   const prev = selId; selId = null; if(prev) restyle(prev);
 }
-$('#shClose').onclick = cerrarSheet; $('#scrim').onclick = cerrarSheet;
+$('#shClose').onclick = cerrarSheet; $('#scrim').onclick = () => { cerrarSheet(); cerrarRed(); };
 function guardarSheet(){
   if(!selId) return false;
   if(!shSel){ toast('Elegí un estado'); return false; }
   if(!cfg.nombre){ pedirNombre(); return false; }
-  guardar(selId, {e:shSel, o:$('#shObs').value.trim(), u:cfg.nombre, t:Date.now()});
+  const rec = {e:shSel, o:$('#shObs').value.trim(), u:cfg.nombre, t:Date.now()};
+  for(const [k] of P_CAMPOS) if(shF[k]) rec[k] = shF[k];
+  const hab = parseInt($('#shHab').value, 10); if(hab > 0) rec.hab = hab;
+  guardar(selId, rec);
   toast(`${titulo(selId)}: ${ESTADOS[shSel].t}`);
   return true;
 }
@@ -501,10 +776,13 @@ $('#shClear').onclick = () => {
 };
 
 /* ===== Guardado y sincronización ===== */
-function guardar(id, rec){
-  if(rec) relev[id] = rec; else delete relev[id];
-  if(cfg.fb){ cola = cola.filter(q => q.id !== id); cola.push({id, rec}); }
-  saveLocal(); restyle(id); renderAll(); flush();
+const colDe = q => q.c || 'relev';
+function repintar(c, id){ if(c === 'relev') restyle(id); else if(c === 'tramos') restyleT(id); else restyleB(id); }
+function guardar(id, rec, c = 'relev'){
+  const o = ST()[c];
+  if(rec) o[id] = rec; else delete o[id];
+  if(cfg.fb){ cola = cola.filter(q => !(q.id === id && colDe(q) === c)); cola.push({c, id, rec}); }
+  saveLocal(); repintar(c, id); renderAll(); flush();
 }
 async function flush(){
   if(!db || !online || flushing || !cola.length) return;
@@ -513,15 +791,16 @@ async function flush(){
   try{
     while(cola.length){
       const q = cola[0];
-      await B.child('relev/' + q.id).set(q.rec || null);
-      B.child('hist/' + q.id).push(q.rec || {e:'borrado', u:cfg.nombre || '', t:Date.now()});
+      const c = colDe(q);
+      await B.child(c + '/' + q.id).set(q.rec || null);
+      B.child((c === 'relev' ? 'hist/' : 'histRed/' + c + '_') + q.id).push(q.rec || {e:'borrado', u:cfg.nombre || '', t:Date.now()});
       cola = cola.filter(x => x !== q); saveLocal();
     }
   }catch(e){ console.warn(e); toast('No se pudo sincronizar: ' + e.message); }
   flushing = false; updSync();
 }
 setInterval(flush, 20000);
-const pendientesSet = () => new Set(cola.map(q => q.id));
+const pendientesSet = (c = 'relev') => new Set(cola.filter(q => colDe(q) === c).map(q => q.id));
 
 function conectarFirebase(){
   updSync();
@@ -555,15 +834,28 @@ function conectarFirebase(){
       }catch(e){ console.warn('red', e); }
     }
   });
-  const R = B.child('relev');
-  R.once('value', s => {
-    const srv = s.val() || {}, pend = pendientesSet();
-    for(const id in relev) if(!(id in srv) && !pend.has(id)){ delete relev[id]; restyle(id); }
-    saveLocal(); programarRender();
+  B.child('frentes/v').on('value', async s => {
+    const v = s.val() || 0;
+    if(v && v !== frentesV){
+      try{
+        const snap = await B.child('frentes/f').once('value');
+        frentes = snap.val() || []; if(!Array.isArray(frentes)) frentes = Object.values(frentes);
+        frentesV = v; await idb.set('frentes', frentes); await idb.set('frentesv', v);
+        buildFrentes(); renderAll();
+      }catch(e){ console.warn('frentes', e); }
+    }
   });
-  const upd = s => { if(pendientesSet().has(s.key)) return; relev[s.key] = s.val(); restyle(s.key); saveLocal(); programarRender(); };
-  R.on('child_added', upd); R.on('child_changed', upd);
-  R.on('child_removed', s => { if(pendientesSet().has(s.key)) return; delete relev[s.key]; restyle(s.key); saveLocal(); programarRender(); });
+  for(const c of ['relev', 'tramos', 'bocas']){
+    const R = B.child(c);
+    R.once('value', s => {
+      const srv = s.val() || {}, pend = pendientesSet(c), o = ST()[c];
+      for(const id in o) if(!(id in srv) && !pend.has(id)){ delete o[id]; repintar(c, id); }
+      saveLocal(); programarRender();
+    });
+    const upd = s => { if(pendientesSet(c).has(s.key)) return; ST()[c][s.key] = s.val(); repintar(c, s.key); saveLocal(); programarRender(); };
+    R.on('child_added', upd); R.on('child_changed', upd);
+    R.on('child_removed', s => { if(pendientesSet(c).has(s.key)) return; delete ST()[c][s.key]; repintar(c, s.key); saveLocal(); programarRender(); });
+  }
 }
 
 /* ===== Lista ===== */
@@ -627,6 +919,64 @@ function renderAvance(){
       <table><thead><tr><th>Mz</th><th>Avance</th><th class="n">Rel.</th><th class="n" style="color:var(--si)">Con.</th><th class="n" style="color:var(--red)">S/c</th><th class="n" style="color:var(--no)">S/red</th></tr></thead><tbody>
       ${mzs.map(m => { const x = porMz[m]; return `<tr><td>${esc(m)}</td><td><div class="minibar"><i style="width:${x.r*100/x.t}%"></i></div></td><td class="n">${x.r}/${x.t}</td><td class="n">${x.si}</td><td class="n">${x.red}</td><td class="n">${x.no}</td></tr>`; }).join('')}
       </tbody></table></div>`;
+  $('#avance').insertAdjacentHTML('afterbegin', avanceRed() + avanceExtra());
+}
+const fm = x => Math.round(x).toLocaleString('es-AR') + ' m';
+function avanceRed(){
+  if(!frentes || !frentes.length) return '';
+  const m = {si:0, no:0, dud:0}; let pend = 0, est = 0, nRel = 0, conProb = 0;
+  const porD = {}, porM = {}, porC = {}, porU = {};
+  for(const f of frentes){
+    if(indicioT(f)) est += f.m;
+    const r = tramos[f.id]; if(!r){ pend += f.m; continue; }
+    nRel++; const L0 = largoT(f.id); if(m[r.e] !== undefined) m[r.e] += L0;
+    if(r.e === 'si'){
+      const d = r.diam ? T_TXT.diam[r.diam] : 'Sin dato'; porD[d] = (porD[d] || 0) + L0;
+      const mt = r.mat ? T_TXT.mat[r.mat] : 'Sin dato'; porM[mt] = (porM[mt] || 0) + L0;
+      const cs = r.cons ? T_TXT.cons[r.cons] : 'Sin dato'; porC[cs] = (porC[cs] || 0) + L0;
+      if(r.cons === 'm') conProb++;
+    }
+  }
+  const pct = Math.round(nRel * 100 / frentes.length);
+  const tabla = (tit, o) => `<div class="fl" style="margin-top:12px">${tit}</div>` + (Object.keys(o).length ? Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="stat"><span>${esc(k)}</span><b>${fm(v)}</b></div>`).join('') : '<p>—</p>');
+  const bc = {}; for(const id in bocasRel){ const e = bocasRel[id].e; bc[e] = (bc[e] || 0) + 1; }
+  const probB = (bc.tapa || 0) + (bc.ent || 0) + (bc.obs || 0);
+  return `<div class="card"><h3>Red cloacal · cañería</h3>
+    <div class="kpis">
+      <div class="kpi"><b>${fm(m.si)}</b><span>de cañería confirmada</span></div>
+      <div class="kpi"><b>${pct}%</b><span>${nRel} de ${frentes.length} cuadras relevadas</span></div>
+      <div class="kpi"><b>${fm(est)}</b><span>estimado según plano</span></div>
+      <div class="kpi"><b>${fm(m.no)}</b><span>de cuadras sin cañería</span></div>
+    </div>
+    <div class="stat"><span><span class="dot" style="background:${T_EST.dud.c}"></span>No verificado</span><b>${fm(m.dud)}</b></div>
+    <div class="stat"><span><span class="dot" style="background:${PEND}"></span>Cuadras pendientes</span><b>${fm(pend)}</b></div>
+    ${tabla('Cañería por diámetro', porD)}${tabla('Por material', porM)}${tabla('Por estado de conservación', porC)}
+    ${conProb ? `<p style="color:var(--no);margin-top:8px">${conProb} cuadra(s) con cañería en mal estado u obstruida.</p>` : ''}
+    ${bocasList.length ? `<div class="fl" style="margin-top:12px">Bocas de inspección · ${Object.keys(bocasRel).length} de ${bocasList.length} relevadas</div>` +
+      Object.entries(B_EST).map(([k, e]) => `<div class="stat"><span><span class="dot" style="background:${e.c}"></span>${e.t}</span><b>${bc[k] || 0}</b></div>`).join('') +
+      (probB ? `<p style="color:var(--no);margin-top:8px">${probB} boca(s) necesitan intervención.</p>` : '') : ''}
+  </div>`;
+}
+function avanceExtra(){
+  const c = {}, inc = (k, v) => { const key = k + ':' + v; c[key] = (c[key] || 0) + 1; };
+  let hab = 0, nHab = 0, n = 0;
+  for(const id in relev){ const r = relev[id]; let tiene = false;
+    for(const [k] of P_CAMPOS) if(r[k]){ inc(k, r[k]); tiene = true; }
+    if(r.hab){ hab += r.hab; nHab++; tiene = true; }
+    if(tiene) n++;
+  }
+  if(!n) return '';
+  const g = (k, v) => c[k + ':' + v] || 0;
+  const factibles = Object.values(relev).filter(r => r.e === 'red').length;
+  return `<div class="card"><h3>Datos de los terrenos</h3>
+    <p>${n} terrenos con datos adicionales cargados.</p>
+    <div class="stat"><span>Red frente al terreno sin conectar (conexión factible)</span><b>${factibles}</b></div>
+    <div class="stat"><span>Usan pozo negro o cámara séptica</span><b>${g('pozo','si')}</b></div>
+    <div class="stat"><span style="color:var(--no)">Pluvial conectado a la cloaca</span><b>${g('pluv','si')}</b></div>
+    <div class="stat"><span>Cámara domiciliaria visible</span><b>${g('cam','si')} sí · ${g('cam','no')} no</b></div>
+    <div class="stat"><span>Uso</span><b>${P_CAMPOS[0][2].map(([v, t]) => g('uso', v) ? `${t} ${g('uso', v)}` : '').filter(Boolean).join(' · ') || '—'}</b></div>
+    ${nHab ? `<div class="stat"><span>Personas (en ${nHab} terrenos)</span><b>${hab} · prom. ${(hab / nHab).toFixed(1)}</b></div>` : ''}
+  </div>`;
 }
 
 let rafT = null;
@@ -750,6 +1100,7 @@ function construir(){
     const p = {mz, pc}; const cta = val(pr, 'cta'), dir = val(pr, 'dir');
     if(cta) p.cta = cta; if(dir) p.dir = dir;
     for(const k of ['pad', 'tit', 'reg']){ const v = val(pr, k); if(v) p[k] = v; }
+    for(const [k, a] of [['cuenta_cloaca','cc'], ['diametro_catastro','dc'], ['conexion_plano','cp'], ['superficie','sup']]){ const v = String(pr[k] ?? '').trim(); if(v) p[a] = v; }
     let g = r.geom;
     if(!g && m.lat && m.lng){ const la = num(pr[m.lat]), ln = num(pr[m.lng]); if(isFinite(la) && isFinite(ln) && la && ln) g = {type:'Point', coordinates:[ln, la]}; }
     if(g){ p.g = redondear(g); conGeo++; }
@@ -791,18 +1142,46 @@ function descargar(nombre, contenido, tipo){
 }
 const hoyStr = () => new Date().toISOString().slice(0, 10);
 $('#btnCSV').onclick = () => {
-  const filas = [['id','manzana','lote','cuenta','padron','titular','direccion','estado_registro','relevamiento','observaciones','relevador','fecha']];
+  const filas = [['id','manzana','lote','cuenta','padron','titular','direccion','estado_registro','cuenta_cloaca','conexion_plano','relevamiento','uso','pozo_negro','pluvial_a_cloaca','camara_visible','personas','observaciones','relevador','fecha']];
+  const tx = (k, r) => r && r[k] ? P_TXT[k][r[k]] : '';
   for(const id of idsOrdenados()){
     const p = parcelas[id], r = relev[id];
-    filas.push([id, p.mz, p.pc, p.cta || '', p.pad || '', p.tit || '', p.dir || '', p.reg || '', r ? (ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) : 'Pendiente', r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']);
+    filas.push([id, p.mz, p.pc, p.cta || '', p.pad || '', p.tit || '', p.dir || '', p.reg || '', p.cc || '', p.cp || '', r ? (ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) : 'Pendiente',
+      tx('uso', r), tx('pozo', r), tx('pluv', r), tx('cam', r), r && r.hab ? r.hab : '', r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']);
   }
-  const csv = '\ufeff' + filas.map(f => f.map(c => { c = String(c ?? ''); return /[";\r\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';')).join('\r\n');
-  descargar(`relevamiento-cloacas-${hoyStr()}.csv`, csv, 'text/csv;charset=utf-8');
+  descargar(`relevamiento-cloacas-${hoyStr()}.csv`, aCSV(filas), 'text/csv;charset=utf-8');
+};
+const aCSV = filas => '\ufeff' + filas.map(f => f.map(c => { c = String(c ?? ''); return /[";\r\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';')).join('\r\n');
+const num2 = x => x === '' || x == null ? '' : String(x).replace('.', ',');
+$('#btnCSVred').onclick = () => {
+  if(!frentes || !frentes.length) return toast('No hay cuadras cargadas');
+  const filas = [['cuadra','manzana','calle','largo_calculado_m','largo_medido_m','largo_usado_m','indicio_plano_conexiones','bocas_cercanas','relevamiento','diametro','material','ubicacion','conservacion','profundidad_m','observaciones','relevador','fecha']];
+  for(const f of [...frentes].sort((a, b) => cmp(a.mz, b.mz) || cmp(a.id, b.id))){
+    const r = tramos[f.id], d = (k) => r && r[k] ? T_TXT[k][r[k]] : '';
+    filas.push([f.id, f.mz, f.calle, num2(f.m), num2(r && r.lm || ''), num2(largoT(f.id)), f.cad, f.bi, r ? T_EST[r.e].t : 'Pendiente', d('diam'), d('mat'), d('ubi'), d('cons'), num2(r && r.prof || ''), r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']);
+  }
+  descargar(`cañeria-cloacas-${hoyStr()}.csv`, aCSV(filas), 'text/csv;charset=utf-8');
+};
+$('#btnCSVbi').onclick = () => {
+  if(!bocasList.length) return toast('No hay bocas cargadas');
+  const filas = [['boca','latitud','longitud','estado','profundidad_m','observaciones','relevador','fecha']];
+  for(const b of bocasList){ const r = bocasRel[b.id];
+    filas.push([b.n, num2(b.ll.lat.toFixed(6)), num2(b.ll.lng.toFixed(6)), r ? B_EST[r.e].t : 'Pendiente', num2(r && r.prof || ''), r ? r.o || '' : '', r ? r.u || '' : '', r ? fmtFecha(r.t) : '']); }
+  descargar(`bocas-inspeccion-${hoyStr()}.csv`, aCSV(filas), 'text/csv;charset=utf-8');
+};
+$('#btnGeoRed').onclick = () => {
+  if(!frentes || !frentes.length) return toast('No hay cuadras cargadas');
+  const features = frentes.map(f => { const r = tramos[f.id];
+    return {type:'Feature', geometry:{type:'LineString', coordinates:f.g}, properties:{cuadra:f.id, manzana:f.mz, calle:f.calle, largo_m:largoT(f.id), estado: r ? r.e : 'pendiente', estado_txt: r ? T_EST[r.e].t : 'Pendiente',
+      diametro: r && r.diam || '', material: r && r.mat ? T_TXT.mat[r.mat] : '', conservacion: r && r.cons ? T_TXT.cons[r.cons] : '', profundidad_m: r && r.prof || '', observaciones: r ? r.o || '' : '', relevador: r ? r.u || '' : '', fecha: r ? new Date(r.t).toISOString() : ''}}; })
+    .concat(bocasList.map(b => { const r = bocasRel[b.id];
+      return {type:'Feature', geometry:{type:'Point', coordinates:[b.ll.lng, b.ll.lat]}, properties:{boca:b.n, estado: r ? r.e : 'pendiente', estado_txt: r ? B_EST[r.e].t : 'Pendiente', profundidad_m: r && r.prof || '', observaciones: r ? r.o || '' : ''}}; }));
+  descargar(`red-cloacal-relevada-${hoyStr()}.geojson`, JSON.stringify({type:'FeatureCollection', features}), 'application/geo+json');
 };
 $('#btnGeo').onclick = () => {
   const features = idsOrdenados().filter(id => parcelas[id].g).map(id => {
     const p = parcelas[id], r = relev[id];
-    return {type:'Feature', geometry:p.g, properties:{id, manzana:p.mz, parcela:p.pc, cuenta:p.cta || '', direccion:p.dir || '', estado: r ? r.e : 'pendiente', estado_txt: r ? (ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) : 'Pendiente', observaciones: r ? r.o || '' : '', relevador: r ? r.u || '' : '', fecha: r ? new Date(r.t).toISOString() : ''}};
+    return {type:'Feature', geometry:p.g, properties:{id, manzana:p.mz, parcela:p.pc, cuenta:p.cta || '', direccion:p.dir || '', uso: r && r.uso ? P_TXT.uso[r.uso] : '', pozo_negro: r && r.pozo ? P_TXT.pozo[r.pozo] : '', pluvial_a_cloaca: r && r.pluv ? P_TXT.pluv[r.pluv] : '', estado: r ? r.e : 'pendiente', estado_txt: r ? (ESTADOS[r.e] ? ESTADOS[r.e].t : r.e) : 'Pendiente', observaciones: r ? r.o || '' : '', relevador: r ? r.u || '' : '', fecha: r ? new Date(r.t).toISOString() : ''}};
   });
   descargar(`relevamiento-cloacas-${hoyStr()}.geojson`, JSON.stringify({type:'FeatureCollection', features}), 'application/geo+json');
 };
@@ -810,11 +1189,12 @@ $('#btnGeo').onclick = () => {
 /* ===== Mantenimiento ===== */
 $('#btnRecargar').onclick = async () => { await idb.set('pversion', 0); location.reload(); };
 $('#btnBorrarTodo').onclick = async () => {
-  const n = Object.keys(relev).length;
-  if(prompt(`Se borran los ${n} relevamientos${cfg.fb ? ' para TODOS los usuarios' : ''}. Escribí BORRAR para confirmar.`) !== 'BORRAR') return;
+  const n = Object.keys(relev).length + Object.keys(tramos).length + Object.keys(bocasRel).length;
+  if(prompt(`Se borran los ${n} relevamientos (terrenos, cuadras y bocas)${cfg.fb ? ' para TODOS los usuarios' : ''}. Escribí BORRAR para confirmar.`) !== 'BORRAR') return;
   try{
-    if(db) await db.ref(cfg.base).child('relev').remove();
-    relev = {}; cola = []; saveLocal(); buildLayer(); renderAll(); toast('Relevamientos borrados');
+    if(db) for(const c of ['relev', 'tramos', 'bocas']) await db.ref(cfg.base).child(c).remove();
+    for(const o of [relev, tramos, bocasRel]) for(const k in o) delete o[k];
+    cola = []; saveLocal(); buildLayer(); buildFrentes(); buildBocas(); renderAll(); toast('Relevamientos borrados');
   }catch(e){ toast('Error: ' + e.message); }
 };
 
@@ -827,11 +1207,16 @@ $('#btnBorrarTodo').onclick = async () => {
     pVersion = (await idb.get('pversion')) || 0;
     red = (await idb.get('red')) || null;
     redV = (await idb.get('redv')) || 0;
+    tramos = (await idb.get('tramos')) || {};
+    bocasRel = (await idb.get('bocas')) || {};
+    frentes = (await idb.get('frentes')) || null;
+    frentesV = (await idb.get('frentesv')) || 0;
   }catch(e){ console.warn('IndexedDB', e); }
+  try{ if(localStorage.getItem('rc_modo') === 'red') modo = 'red'; }catch(e){}
   $('#cfgNombre').value = cfg.nombre || '';
   $('#cfgBase').value = cfg.base;
   if(cfg.fb) $('#cfgFb').value = JSON.stringify(cfg.fb, null, 2);
-  updUser(); initMap(); buildRed(); renderAll(); conectarFirebase();
+  updUser(); initMap(); buildRed(); buildFrentes(); aplicarModo(); renderAll(); conectarFirebase();
   if(!cfg.nombre) pedirNombre();
   window.addEventListener('online', flush);
   window.addEventListener('beforeunload', e => { if(cola.length){ e.preventDefault(); e.returnValue = ''; } });
