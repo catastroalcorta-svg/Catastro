@@ -420,7 +420,7 @@ function tipoRed(t){ t = String(t || '').toLowerCase(); return t.includes('boca'
 function buildRed(){
   if(redLayer){ map.removeLayer(redLayer); ctlLayers.removeLayer(redLayer); redLayer = null; }
   if(!red || !red.length){ $('#redInfo').textContent = 'Sin capa de red cargada.'; return; }
-  redLayer = L.geoJSON({type:'FeatureCollection', features: red.map(x => ({type:'Feature', properties:{t:x.t}, geometry:x.g}))}, {
+  redLayer = L.geoJSON({type:'FeatureCollection', features: red.filter(x => tipoRed(x.t) !== 'conexion').map(x => ({type:'Feature', properties:{t:x.t}, geometry:x.g}))}, {
     style: f => RED_EST[tipoRed(f.properties.t)],
     pointToLayer: (f, ll) => L.circleMarker(ll, RED_EST[tipoRed(f.properties.t)])
   }).addTo(map);
@@ -702,7 +702,7 @@ function renderLegend(){
   const c = contar();
   $('#legend').innerHTML = Object.entries(ESTADOS).map(([k,e]) => `<div><span class="dot" style="background:${e.c}"></span>${e.t} <b>${c[k]}</b></div>`).join('')
     + `<div><span class="dot" style="background:${PEND}"></span>Pendiente <b>${c.pend}</b></div>`
-    + (red ? `<div style="border-top:1px solid var(--bd);margin-top:4px;padding-top:4px"><span style="display:inline-block;width:14px;height:3px;background:#7c2d12;vertical-align:3px;margin-right:6px"></span>Colector</div><div><span class="dot" style="background:#1e293b"></span>Boca insp. <span class="dot" style="background:#0891b2;width:7px;height:7px;margin-left:6px"></span>Conexión</div>` : '')
+    + (red ? `<div style="border-top:1px solid var(--bd);margin-top:4px;padding-top:4px"><span style="display:inline-block;width:14px;height:3px;background:#7c2d12;vertical-align:3px;margin-right:6px"></span>Colector</div><div><span class="dot" style="background:#1e293b"></span>Boca de inspección</div>` : '')
     + (c.total && c.total > Object.keys(centros).length ? `<div style="color:var(--mut);margin-top:4px">${c.total - Object.keys(centros).length} sin ubicación → ver Lista</div>` : '');
 }
 
