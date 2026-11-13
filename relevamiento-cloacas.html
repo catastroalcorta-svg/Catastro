@@ -40,6 +40,7 @@ nav button.on{color:var(--pri);font-weight:600}
 .fab{position:absolute;z-index:500;border:0;border-radius:99px;box-shadow:0 3px 10px rgba(0,0,0,.25);background:#fff;color:var(--tx)}
 #btnLoc{right:10px;bottom:96px;width:46px;height:46px;font-size:20px}
 #btnLoc.on{background:#2563eb;color:#fff}
+#btnCuadra{right:10px;bottom:204px;padding:11px 14px;font-weight:700;font-size:14px;background:#1e293b;color:#fff}
 #btnBoca{right:10px;bottom:150px;padding:11px 14px;font-weight:700;font-size:14px;background:#1e293b;color:#fff}
 .colocar{position:absolute;left:10px;right:10px;bottom:76px;z-index:700;background:#1e293b;color:#fff;border-radius:14px;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-size:14px}
 .colocar .row{margin-top:10px}.colocar .btn{padding:9px 10px;font-size:13px}
@@ -139,7 +140,12 @@ code{background:#f1f5f9;padding:1px 5px;border-radius:5px;font-size:12px}
     <div class="legend" id="legend"></div>
     <div class="modo" id="modo"><button data-m="ter" class="on">Terrenos</button><button data-m="red">Cañería</button></div>
     <button class="fab" id="btnLoc" title="Mi ubicación">📍</button>
+    <button class="fab" id="btnCuadra" hidden>＋ Cuadra</button>
     <button class="fab" id="btnBoca" hidden>＋ Boca</button>
+    <div class="colocar" id="dibujar" hidden>
+      <b>Dibujar cuadra</b><br><span id="dibTxt">Tocá el mapa en el inicio de la cuadra.</span>
+      <div class="row"><button class="btn primary" id="dibOk" disabled>Listo</button><button class="btn" id="dibUndo" disabled>Deshacer</button><button class="btn" id="dibCancel">Cancelar</button></div>
+    </div>
     <div class="colocar" id="colocar" hidden>
       <b>Agregar boca de inspección</b><br>Tocá el mapa justo donde está la boca.
       <div class="row"><button class="btn primary" id="colGPS">Usar mi ubicación</button><button class="btn" id="colCancel">Cancelar</button></div>
@@ -282,7 +288,7 @@ const ESTADOS = {
 const PEND = '#94a3b8';
 const CENTRO = [-33.536, -61.122]; // Alcorta
 const LS_CFG = 'rc_cfg';
-const APP_VERSION = '6 · 12/11/2026 · agregar bocas';
+const APP_VERSION = '7 · 13/11/2026 · todas las cuadras + dibujar cuadra';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -309,11 +315,12 @@ let map, layer, layersById = {}, centros = {}, fitted = false;
 let red = null, redV = 0, redLayer = null, ctlLayers = null;
 let grupos = {}, grupoDe = {};
 let tramos = {}, bocasRel = {};          // relevamiento de red: frenteId -> rec, bocaId -> rec
+let frentesBase = null, frentesNuevas = {}, dibujando = false, dibPts = [], dibLine = null;
 let frentes = null, frentesV = 0, frentesById = {}, frentesLayer = null, frentesLy = {};
 let bocasList = [], bocasById = {}, bocasLayer = null, bocasLy = {};
 let modo = 'ter', s2 = null;             // s2 = {k:'t'|'b', id, sel, f:{...}}
 let bocasNuevas = {}, bocasBase = [], colocando = false;   // bocas agregadas en campo: id -> {lat, lng, u, t}
-const ST = () => ({relev, tramos, bocas: bocasRel, bocasN: bocasNuevas});
+const ST = () => ({relev, tramos, bocas: bocasRel, bocasN: bocasNuevas, frentesN: frentesNuevas});
 const hermanos = id => grupoDe[id] ? grupos[grupoDe[id]] : [id];
 const capaDe = id => layersById[id] || (grupoDe[id] && layersById[grupos[grupoDe[id]][0]]);
 let selId = null, shSel = null, miPos = null, locMarker = null, locCircle = null, locOn = false;
@@ -334,7 +341,7 @@ const idb = (() => {
   return { get: k => tx('readonly', s => s.get(k)), set: (k, v) => tx('readwrite', s => s.put(v, k)) };
 })();
 let saveT;
-function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('tramos', tramos); idb.set('bocas', bocasRel); idb.set('bocasN', bocasNuevas); idb.set('cola', cola); updSync(); }, 250); }
+function saveLocal(){ clearTimeout(saveT); saveT = setTimeout(() => { idb.set('relev', relev); idb.set('tramos', tramos); idb.set('bocas', bocasRel); idb.set('bocasN', bocasNuevas); idb.set('frentesN', frentesNuevas); idb.set('cola', cola); updSync(); }, 250); }
 
 /* ===== UI utilitarios ===== */
 let toastT;
@@ -383,7 +390,7 @@ function initMap(){
     } else { locMarker.setLatLng(e.latlng); locCircle.setLatLng(e.latlng).setRadius(e.accuracy); }
     if(first) map.setView(e.latlng, Math.max(map.getZoom(), 18));
   });
-  map.on('click', e => { if(colocando) ponerBoca(e.latlng); });
+  map.on('click', e => { if(dibujando) puntoDib(e.latlng); else if(colocando) ponerBoca(e.latlng); });
   map.on('locationerror', e => { toast('No se pudo obtener la ubicación: ' + e.message); locOn = false; $('#btnLoc').classList.remove('on'); });
   buildLayer();
 }
@@ -415,7 +422,7 @@ function buildLayer(){
       let cc = null; try { cc = l.getLatLng ? l.getLatLng() : l.getBounds().getCenter(); } catch(e) {}
       if(cc) hermanos(id).forEach(h => centros[h] = cc);
       // al tocar, abre la primera cuenta pendiente del terreno
-      l.on('click', e => { if(modo === 'red') return; if(colocando) return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
+      l.on('click', e => { if(modo === 'red') return; if(colocando || dibujando) return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
     }
   }).addTo(map);
   if(feats.length && !fitted){ try { map.fitBounds(layer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
@@ -513,6 +520,14 @@ function styleB(id){
   return {radius: sel ? 10 : 8, color: sel ? '#0f172a' : '#fff', weight: sel ? 3 : 2, fillColor: r && B_EST[r.e] ? B_EST[r.e].c : '#1e293b', fillOpacity: 1};
 }
 const rendT = L.canvas({tolerance: 10, padding: .3});
+const largoGeo = g => { let m = 0; for(let i = 1; i < g.length; i++) m += L.latLng(g[i-1][1], g[i-1][0]).distanceTo(L.latLng(g[i][1], g[i][0])); return Math.round(m * 10) / 10; };
+function armarFrentes(){
+  const nv = Object.entries(frentesNuevas).filter(([, v]) => v && Array.isArray(v.g) && v.g.length >= 2).sort((a, b) => (a[1].t || 0) - (b[1].t || 0))
+    .map(([id, v], i) => ({id, mz: v.mz || '', calle: v.calle || '', m: largoGeo(v.g), cad: 0, bi: 0, g: v.g, nueva: true, n: i + 1, por: v.u, cuando: v.t}));
+  frentes = (frentesBase || []).concat(nv);
+  if(!frentes.length) frentes = null;
+  buildFrentes();
+}
 function buildFrentes(){
   if(frentesLayer){ map.removeLayer(frentesLayer); frentesLayer = null; }
   frentesById = {}; frentesLy = {};
@@ -520,11 +535,11 @@ function buildFrentes(){
   frentes.forEach(f => frentesById[f.id] = f);
   frentesLayer = L.layerGroup(frentes.map(f => {
     const l = L.polyline(f.g.map(c => [c[1], c[0]]), Object.assign({renderer: rendT}, styleT(f.id)));
-    l.on('click', e => { L.DomEvent.stopPropagation(e); if(colocando) return ponerBoca(e.latlng); abrirRed('t', f.id); });
+    l.on('click', e => { L.DomEvent.stopPropagation(e); if(dibujando) return puntoDib(e.latlng); if(colocando) return ponerBoca(e.latlng); abrirRed('t', f.id); });
     frentesLy[f.id] = l; return l;
   }));
-  const tot = frentes.reduce((a, f) => a + f.m, 0), est = frentes.filter(indicioT).reduce((a, f) => a + f.m, 0);
-  $('#frentesInfo').textContent = `Cargadas: ${frentes.length} cuadras · ${Math.round(tot).toLocaleString('es-AR')} m de frentes · ${Math.round(est).toLocaleString('es-AR')} m con indicios de cañería en el plano.`;
+  const tot = frentes.reduce((a, f) => a + f.m, 0), est = frentes.filter(indicioT).reduce((a, f) => a + f.m, 0), nNv = frentes.filter(f => f.nueva).length;
+  $('#frentesInfo').textContent = `Cargadas: ${frentes.length} cuadras${nNv ? ` (${nNv} dibujadas en campo)` : ''} · ${Math.round(tot).toLocaleString('es-AR')} m de frentes · ${Math.round(est).toLocaleString('es-AR')} m con indicios de cañería en el plano.`;
   aplicarModo();
 }
 function buildBocas(){
@@ -533,14 +548,14 @@ function buildBocas(){
   if(!bocasList.length) return;
   bocasLayer = L.layerGroup(bocasList.map(b => {
     const l = L.circleMarker(b.ll, Object.assign({renderer: rendT}, styleB(b.id)));
-    l.on('click', e => { L.DomEvent.stopPropagation(e); if(colocando) return ponerBoca(e.latlng); abrirRed('b', b.id); });
+    l.on('click', e => { L.DomEvent.stopPropagation(e); if(dibujando) return puntoDib(e.latlng); if(colocando) return ponerBoca(e.latlng); abrirRed('b', b.id); });
     bocasLy[b.id] = l; return l;
   }));
   aplicarModo();
 }
 const restyleT = id => { const l = frentesLy[id]; if(l) l.setStyle(styleT(id)); };
 function modoColocar(on){
-  colocando = on; $('#colocar').hidden = !on; $('#btnBoca').hidden = on || modo !== 'red'; $('#btnNext').hidden = on;
+  colocando = on; $('#colocar').hidden = !on; $('#btnBoca').hidden = $('#btnCuadra').hidden = on || modo !== 'red'; $('#btnNext').hidden = on;
   map.getContainer().classList.toggle('poniendo', on);
 }
 $('#btnBoca').onclick = () => {
@@ -565,6 +580,50 @@ function ponerBoca(ll){
   toast(`Boca Nº ${b ? b.n : ''} agregada. Marcá su estado.`);
   abrirRed('b', id);
 }
+function modoDibujar(on){
+  dibujando = on; dibPts = [];
+  if(dibLine){ map.removeLayer(dibLine); dibLine = null; }
+  $('#dibujar').hidden = !on; $('#btnBoca').hidden = $('#btnCuadra').hidden = on || modo !== 'red'; $('#btnNext').hidden = on;
+  map.getContainer().classList.toggle('poniendo', on);
+  if(on) pintarDib();
+}
+function pintarDib(){
+  if(dibLine){ map.removeLayer(dibLine); dibLine = null; }
+  if(dibPts.length){
+    dibLine = L.layerGroup([L.polyline(dibPts, {color:'#2563eb', weight:6, dashArray:'2 9', lineCap:'round', interactive:false})]
+      .concat(dibPts.map(p => L.circleMarker(p, {radius:5, color:'#2563eb', fillColor:'#fff', fillOpacity:1, weight:3, interactive:false})))).addTo(map);
+  }
+  let m = 0; for(let i = 1; i < dibPts.length; i++) m += dibPts[i-1].distanceTo(dibPts[i]);
+  $('#dibTxt').textContent = !dibPts.length ? 'Tocá el mapa en el inicio de la cuadra.' : dibPts.length === 1 ? 'Ahora tocá el final (o una esquina intermedia si dobla).' : `${dibPts.length} puntos · ${Math.round(m).toLocaleString('es-AR')} m. Tocá Listo o seguí agregando puntos.`;
+  $('#dibOk').disabled = dibPts.length < 2; $('#dibUndo').disabled = !dibPts.length;
+}
+function puntoDib(ll){ if(!dibujando) return; dibPts.push(ll); pintarDib(); }
+$('#btnCuadra').onclick = () => {
+  if(!cfg.nombre){ pedirNombre(); return; }
+  cerrarRed(); cerrarSheet(); if(colocando) modoColocar(false); modoDibujar(true);
+};
+$('#dibUndo').onclick = () => { dibPts.pop(); pintarDib(); };
+$('#dibCancel').onclick = () => modoDibujar(false);
+$('#dibOk').onclick = () => {
+  if(dibPts.length < 2) return;
+  const g = dibPts.map(p => [Math.round(p.lng * 1e7) / 1e7, Math.round(p.lat * 1e7) / 1e7]);
+  const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  // manzana y calle de la cuadra existente más cercana, como referencia
+  const mid = dibPts[Math.floor(dibPts.length / 2)];
+  let ref = null, bd = 60; for(const f of frentesBase || []){ const d = mid.distanceTo(centroT(f.id)); if(d < bd){ bd = d; ref = f; } }
+  modoDibujar(false);
+  guardar(id, {g, mz: ref ? ref.mz : '', calle: ref ? ref.calle : '', u: cfg.nombre, t: Date.now()}, 'frentesN');
+  toast('Cuadra agregada. Marcá si hay cañería.');
+  abrirRed('t', id);
+};
+function eliminarCuadra(id){
+  const f = frentesById[id]; if(!f || !f.nueva) return;
+  if(!confirm('¿Eliminar esta cuadra dibujada? Se borra para todos.')) return;
+  cerrarRed();
+  if(tramos[id]) guardar(id, null, 'tramos');
+  guardar(id, null, 'frentesN');
+  toast('Cuadra eliminada');
+}
 function eliminarBoca(id){
   const b = bocasById[id]; if(!b || !b.nueva) return;
   if(!confirm(`¿Eliminar la boca Nº ${b.n}? Se borra para todos.`)) return;
@@ -582,12 +641,13 @@ function aplicarModo(){
   if(on){ if(frentesLayer) frentesLayer.eachLayer(l => l.bringToFront()); if(bocasLayer) bocasLayer.eachLayer(l => l.bringToFront()); }
   $('#btnNext').textContent = on ? 'Siguiente cuadra pendiente ›' : 'Siguiente pendiente cercano ›';
   if(!on && colocando) modoColocar(false);
-  $('#btnBoca').hidden = !on || colocando;
+  if(!on && dibujando) modoDibujar(false);
+  $('#btnBoca').hidden = $('#btnCuadra').hidden = !on || colocando || dibujando;
   renderLegend();
 }
 $('#modo').onclick = ev => {
   const b = ev.target.closest('button'); if(!b || b.dataset.m === modo) return;
-  if(b.dataset.m === 'red' && !frentesLayer && !bocasLayer){ toast('Primero cargá las cuadras en Ajustes'); return; }
+
   cerrarSheet(); cerrarRed(); modo = b.dataset.m; try{ localStorage.setItem('rc_modo', modo); }catch(e){} aplicarModo();
 };
 function centroT(id){ const f = frentesById[id]; const c = f.g[Math.floor(f.g.length / 2)], a = f.g[0]; return L.latLng((c[1] + a[1]) / 2, (c[0] + a[0]) / 2); }
@@ -616,8 +676,8 @@ function abrirRed(k, id){
   if(r) for(const x of ['diam','mat','ubi','cons']) if(r[x]) s2.f[x] = r[x];
   if(k === 't'){
     const f = frentesById[id];
-    $('#s2Title').textContent = `Cuadra Mz ${f.mz}` + (f.calle ? ` · ${f.calle}` : '');
-    $('#s2Sub').textContent = `Largo calculado: ${f.m.toLocaleString('es-AR')} m` + (f.cad ? ` · ${f.cad} conexiones en el plano` : '') + (f.bi ? ` · ${f.bi} boca(s) de inspección` : '') + (!indicioT(f) ? ' · sin indicios en el plano' : '');
+    $('#s2Title').textContent = f.nueva ? `Cuadra dibujada Nº ${f.n}` + (f.mz ? ` · cerca Mz ${f.mz}` : '') : `Cuadra Mz ${f.mz}` + (f.calle ? ` · ${f.calle}` : '');
+    $('#s2Sub').textContent = f.nueva ? `Largo dibujado: ${f.m.toLocaleString('es-AR')} m · agregada por ${f.por || '¿?'} · ${fmtFecha(f.cuando)}` : `Largo calculado: ${f.m.toLocaleString('es-AR')} m` + (f.cad ? ` · ${f.cad} conexiones en el plano` : '') + (f.bi ? ` · ${f.bi} boca(s) de inspección` : '') + (!indicioT(f) ? ' · sin indicios en el plano' : '');
     restyleT(id);
   } else {
     const b = bocasById[id];
@@ -630,8 +690,9 @@ function abrirRed(k, id){
   pintarS2(r);
   $('#s2Obs').value = r ? (r.o || '') : '';
   $('#s2Clear').style.display = r ? '' : 'none';
-  const bn = k === 'b' && bocasById[id] && bocasById[id].nueva;
+  const bn = (k === 'b' && bocasById[id] && bocasById[id].nueva) || (k === 't' && frentesById[id] && frentesById[id].nueva);
   $('#s2Del').hidden = !bn;
+  $('#s2Del').textContent = k === 't' ? 'Eliminar esta cuadra' : 'Eliminar esta boca';
   $('#s2Next').textContent = k === 't' ? 'Guardar y siguiente cuadra ›' : 'Guardar y siguiente boca ›';
   $('#sheet2').classList.add('on'); $('#scrim').classList.add('on');
 }
@@ -682,7 +743,7 @@ $('#s2Next').onclick = () => {
   const sig = sigRed(k, id);
   if(sig) irRed(k, sig); else { cerrarRed(); toast(k === 't' ? 'No quedan cuadras pendientes 🎉' : 'No quedan bocas pendientes 🎉'); }
 };
-$('#s2Del').onclick = () => { if(s2) eliminarBoca(s2.id); };
+$('#s2Del').onclick = () => { if(s2) (s2.k === 't' ? eliminarCuadra : eliminarBoca)(s2.id); };
 $('#s2Clear').onclick = () => {
   if(!s2 || !confirm('¿Quitar este relevamiento? Vuelve a quedar pendiente.')) return;
   guardar(s2.id, null, s2.k === 't' ? 'tramos' : 'bocas'); cerrarRed();
@@ -697,7 +758,7 @@ $('#fFrentes').onchange = async ev => {
     if(!confirm(`Publicar ${arr.length} cuadras${db ? ' para todos' : ''}? Lo ya relevado se conserva.`)) return;
     const v = Date.now();
     if(db) await db.ref(cfg.base).child('frentes').set({v, f: arr});
-    else { frentes = arr; frentesV = v; await idb.set('frentes', arr); await idb.set('frentesv', v); buildFrentes(); }
+    else { frentesBase = arr; frentesV = v; await idb.set('frentes', arr); await idb.set('frentesv', v); armarFrentes(); }
     toast('Cuadras publicadas');
   }catch(e){ toast('No pude cargar las cuadras: ' + e.message); }
   ev.target.value = '';
@@ -836,7 +897,7 @@ $('#shClear').onclick = () => {
 
 /* ===== Guardado y sincronización ===== */
 const colDe = q => q.c || 'relev';
-function repintar(c, id){ if(c === 'relev') restyle(id); else if(c === 'tramos') restyleT(id); else if(c === 'bocasN') armarBocas(); else restyleB(id); }
+function repintar(c, id){ if(c === 'relev') restyle(id); else if(c === 'tramos') restyleT(id); else if(c === 'bocasN') armarBocas(); else if(c === 'frentesN') armarFrentes(); else restyleB(id); }
 function guardar(id, rec, c = 'relev'){
   const o = ST()[c];
   if(rec) o[id] = rec; else delete o[id];
@@ -898,13 +959,13 @@ function conectarFirebase(){
     if(v && v !== frentesV){
       try{
         const snap = await B.child('frentes/f').once('value');
-        frentes = snap.val() || []; if(!Array.isArray(frentes)) frentes = Object.values(frentes);
-        frentesV = v; await idb.set('frentes', frentes); await idb.set('frentesv', v);
-        buildFrentes(); renderAll();
+        frentesBase = snap.val() || []; if(!Array.isArray(frentesBase)) frentesBase = Object.values(frentesBase);
+        frentesV = v; await idb.set('frentes', frentesBase); await idb.set('frentesv', v);
+        armarFrentes(); renderAll();
       }catch(e){ console.warn('frentes', e); }
     }
   });
-  for(const c of ['relev', 'tramos', 'bocas', 'bocasN']){
+  for(const c of ['relev', 'tramos', 'bocas', 'bocasN', 'frentesN']){
     const R = B.child(c);
     R.once('value', s => {
       const srv = s.val() || {}, pend = pendientesSet(c), o = ST()[c];
@@ -1251,9 +1312,9 @@ $('#btnBorrarTodo').onclick = async () => {
   const n = Object.keys(relev).length + Object.keys(tramos).length + Object.keys(bocasRel).length;
   if(prompt(`Se borran los ${n} relevamientos (terrenos, cuadras y bocas)${cfg.fb ? ' para TODOS los usuarios' : ''}. Escribí BORRAR para confirmar.`) !== 'BORRAR') return;
   try{
-    if(db) for(const c of ['relev', 'tramos', 'bocas', 'bocasN']) await db.ref(cfg.base).child(c).remove();
-    for(const o of [relev, tramos, bocasRel, bocasNuevas]) for(const k in o) delete o[k];
-    cola = []; saveLocal(); buildLayer(); buildFrentes(); armarBocas(); renderAll(); toast('Relevamientos borrados');
+    if(db) for(const c of ['relev', 'tramos', 'bocas', 'bocasN', 'frentesN']) await db.ref(cfg.base).child(c).remove();
+    for(const o of [relev, tramos, bocasRel, bocasNuevas, frentesNuevas]) for(const k in o) delete o[k];
+    cola = []; saveLocal(); buildLayer(); armarFrentes(); armarBocas(); renderAll(); toast('Relevamientos borrados');
   }catch(e){ toast('Error: ' + e.message); }
 };
 
@@ -1269,7 +1330,8 @@ $('#btnBorrarTodo').onclick = async () => {
     tramos = (await idb.get('tramos')) || {};
     bocasRel = (await idb.get('bocas')) || {};
     bocasNuevas = (await idb.get('bocasN')) || {};
-    frentes = (await idb.get('frentes')) || null;
+    frentesBase = (await idb.get('frentes')) || null;
+    frentesNuevas = (await idb.get('frentesN')) || {};
     frentesV = (await idb.get('frentesv')) || 0;
   }catch(e){ console.warn('IndexedDB', e); }
   try{ if(localStorage.getItem('rc_modo') === 'red') modo = 'red'; }catch(e){}
@@ -1277,7 +1339,7 @@ $('#btnBorrarTodo').onclick = async () => {
   $('#cfgNombre').value = cfg.nombre || '';
   $('#cfgBase').value = cfg.base;
   if(cfg.fb) $('#cfgFb').value = JSON.stringify(cfg.fb, null, 2);
-  updUser(); initMap(); buildRed(); buildFrentes(); aplicarModo(); renderAll(); conectarFirebase();
+  updUser(); initMap(); buildRed(); armarFrentes(); aplicarModo(); renderAll(); conectarFirebase();
   if(!cfg.nombre) pedirNombre();
   window.addEventListener('online', flush);
   window.addEventListener('beforeunload', e => { if(cola.length){ e.preventDefault(); e.returnValue = ''; } });
