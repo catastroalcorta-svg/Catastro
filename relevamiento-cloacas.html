@@ -288,7 +288,7 @@ const ESTADOS = {
 const PEND = '#94a3b8';
 const CENTRO = [-33.536, -61.122]; // Alcorta
 const LS_CFG = 'rc_cfg';
-const APP_VERSION = '7 · 13/11/2026 · todas las cuadras + dibujar cuadra';
+const APP_VERSION = '8 · 17/11/2026 · terrenos se marcan en ambos modos';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -376,7 +376,7 @@ const vistaActual = () => document.querySelector('.view.on').id;
 
 /* ===== Mapa ===== */
 function initMap(){
-  map = L.map('map', {preferCanvas:true, zoomControl:false}).setView(CENTRO, 15);
+  map = L.map('map', {preferCanvas:true, renderer: L.canvas({tolerance: 10, padding: .3}), zoomControl:false}).setView(CENTRO, 15);
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:21, maxNativeZoom:19, attribution:'© OpenStreetMap'});
   const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:21, maxNativeZoom:19, attribution:'Esri'});
   osm.addTo(map);
@@ -399,7 +399,7 @@ function styleFor(id){
   const hs = hermanos(id), pend = hs.find(h => !relev[h]);
   const ref = hs.length > 1 ? (pend !== undefined ? pend : hs[0]) : id;
   const r = relev[ref], c = colorDe(ref), sel = hs.includes(selId);
-  if(modo === 'red') return {color:'#cbd5e1', weight:.6, fillColor:c, fillOpacity: r ? .12 : .04, opacity:1};
+  if(modo === 'red') return sel ? {color:'#0f172a', weight:3, fillColor:c, fillOpacity:.45, opacity:1} : {color:'#cbd5e1', weight:.6, fillColor:c, fillOpacity: r ? .12 : .04, opacity:1};
   return {color: sel ? '#0f172a' : c, weight: sel ? 3.5 : 1.2, fillColor:c, fillOpacity: r ? .55 : .22, opacity:1};
 }
 function restyle(id){ const l = capaDe(id); if(l && l.setStyle) l.setStyle(styleFor(hermanos(id)[0])); }
@@ -422,7 +422,7 @@ function buildLayer(){
       let cc = null; try { cc = l.getLatLng ? l.getLatLng() : l.getBounds().getCenter(); } catch(e) {}
       if(cc) hermanos(id).forEach(h => centros[h] = cc);
       // al tocar, abre la primera cuenta pendiente del terreno
-      l.on('click', e => { if(modo === 'red') return; if(colocando || dibujando) return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
+      l.on('click', e => { if(colocando || dibujando) return; L.DomEvent.stopPropagation(e); const hs = hermanos(id); abrirSheet(hs.find(h => !relev[h]) || hs[0]); });
     }
   }).addTo(map);
   if(feats.length && !fitted){ try { map.fitBounds(layer.getBounds(), {padding:[20,20]}); fitted = true; } catch(e) {} }
@@ -519,7 +519,6 @@ function styleB(id){
   const r = bocasRel[id], sel = s2 && s2.k === 'b' && s2.id === id;
   return {radius: sel ? 10 : 8, color: sel ? '#0f172a' : '#fff', weight: sel ? 3 : 2, fillColor: r && B_EST[r.e] ? B_EST[r.e].c : '#1e293b', fillOpacity: 1};
 }
-const rendT = L.canvas({tolerance: 10, padding: .3});
 const largoGeo = g => { let m = 0; for(let i = 1; i < g.length; i++) m += L.latLng(g[i-1][1], g[i-1][0]).distanceTo(L.latLng(g[i][1], g[i][0])); return Math.round(m * 10) / 10; };
 function armarFrentes(){
   const nv = Object.entries(frentesNuevas).filter(([, v]) => v && Array.isArray(v.g) && v.g.length >= 2).sort((a, b) => (a[1].t || 0) - (b[1].t || 0))
@@ -534,7 +533,7 @@ function buildFrentes(){
   if(!frentes || !frentes.length){ $('#frentesInfo').textContent = 'Sin cuadras cargadas.'; return; }
   frentes.forEach(f => frentesById[f.id] = f);
   frentesLayer = L.layerGroup(frentes.map(f => {
-    const l = L.polyline(f.g.map(c => [c[1], c[0]]), Object.assign({renderer: rendT}, styleT(f.id)));
+    const l = L.polyline(f.g.map(c => [c[1], c[0]]), styleT(f.id));
     l.on('click', e => { L.DomEvent.stopPropagation(e); if(dibujando) return puntoDib(e.latlng); if(colocando) return ponerBoca(e.latlng); abrirRed('t', f.id); });
     frentesLy[f.id] = l; return l;
   }));
@@ -547,7 +546,7 @@ function buildBocas(){
   bocasLy = {};
   if(!bocasList.length) return;
   bocasLayer = L.layerGroup(bocasList.map(b => {
-    const l = L.circleMarker(b.ll, Object.assign({renderer: rendT}, styleB(b.id)));
+    const l = L.circleMarker(b.ll, styleB(b.id));
     l.on('click', e => { L.DomEvent.stopPropagation(e); if(dibujando) return puntoDib(e.latlng); if(colocando) return ponerBoca(e.latlng); abrirRed('b', b.id); });
     bocasLy[b.id] = l; return l;
   }));
