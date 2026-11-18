@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bandeja WhatsApp · Comuna de Alcorta</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{--verde:#1f6f4a;--verde2:#16533a;--claro:#e8f3ed;--fondo:#f2f4f6;--borde:#dde1e6;--texto:#1d2329;--suave:#6b7480;--rojo:#c0392b;--naranja:#d97706}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--texto);background:var(--fondo);font-size:14px}
+  button,select,input,textarea{font-family:inherit;font-size:14px}
+  .oculto{display:none!important}
+  .btn{border:1px solid var(--borde);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer}
+  .btn:hover{background:#f7f7f7}
+  .btn.prim{background:var(--verde);color:#fff;border-color:var(--verde)}
+  .btn.prim:hover{background:var(--verde2)}
+
+  /* Login */
+  .centro{min-height:100%;display:grid;place-items:center;padding:20px}
+  .tarjeta{background:#fff;border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:28px;width:100%;max-width:380px}
+  .tarjeta h1{font-size:19px;margin-bottom:4px}
+  .tarjeta p{color:var(--suave);margin-bottom:18px}
+  .tarjeta label{display:block;font-size:12px;color:var(--suave);margin:10px 0 4px}
+  .tarjeta input{width:100%;padding:10px 12px;border:1px solid var(--borde);border-radius:8px}
+  .tarjeta .acciones{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+  .link{background:none;border:0;color:var(--verde);cursor:pointer;margin-top:12px;font-size:13px}
+
+  /* App */
+  .app{height:100%;display:flex;flex-direction:column}
+  .top{background:var(--verde);color:#fff;display:flex;align-items:center;gap:10px;padding:10px 14px}
+  .top h1{font-size:16px}
+  .top .yo{margin-left:auto;font-size:13px;opacity:.9;text-align:right}
+  .top .btn{background:rgba(255,255,255,.15);border:0;color:#fff}
+  .cuerpo{flex:1;display:flex;min-height:0}
+  .lista{width:360px;border-right:1px solid var(--borde);background:#fff;display:flex;flex-direction:column;min-height:0}
+  .tabs{display:flex;border-bottom:1px solid var(--borde)}
+  .tabs button{flex:1;background:none;border:0;padding:11px 4px;cursor:pointer;color:var(--suave);border-bottom:3px solid transparent}
+  .tabs button.act{color:var(--verde);border-color:var(--verde);font-weight:600}
+  .tabs .num{background:var(--rojo);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;margin-left:3px}
+  .filtros{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--borde)}
+  .filtros input,.filtros select{flex:1;padding:7px 9px;border:1px solid var(--borde);border-radius:8px;min-width:0}
+  #convs{overflow-y:auto;flex:1}
+  .conv{padding:10px 12px;border-bottom:1px solid #eef0f2;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:3px 8px}
+  .conv:hover{background:#f8faf9}
+  .conv.sel{background:var(--claro)}
+  .conv .nom{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conv .hora{font-size:11px;color:var(--suave)}
+  .conv .ult{color:var(--suave);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conv .badge{background:#25d366;color:#fff;border-radius:10px;font-size:11px;padding:1px 7px;justify-self:end;font-weight:700}
+  .conv .meta{grid-column:1/-1;display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+  .chip{font-size:11px;padding:2px 7px;border-radius:10px;background:#eef0f2;color:#444;white-space:nowrap}
+  .vence{font-size:11px;color:var(--suave)}
+  .vence.alerta{color:var(--naranja);font-weight:600}
+  .vence.vencida{color:var(--rojo);font-weight:600}
+  .vacio{color:var(--suave);text-align:center;padding:40px 20px}
+
+  .chat{flex:1;display:flex;flex-direction:column;min-width:0;background:#efeae2}
+  .chat-top{background:#fff;padding:9px 14px;border-bottom:1px solid var(--borde);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .chat-top .info{flex:1;min-width:160px}
+  .chat-top .info b{display:block}
+  .chat-top .info span{font-size:12px;color:var(--suave)}
+  .chat-top select{padding:7px;border:1px solid var(--borde);border-radius:8px}
+  .volver{display:none}
+  #mensajes{flex:1;overflow-y:auto;padding:16px 6%;display:flex;flex-direction:column;gap:6px}
+  .m{max-width:75%;padding:7px 10px 5px;border-radius:9px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.08);white-space:pre-wrap;word-wrap:break-word}
+  .m .pie{font-size:10.5px;color:var(--suave);text-align:right;margin-top:2px}
+  .m.vecino{background:#fff;align-self:flex-start}
+  .m.empleado{background:#d9fdd3;align-self:flex-end}
+  .m.bot{background:#f1f5f9;align-self:flex-end;color:#475569;font-size:13px}
+  .m.sistema{align-self:center;background:#fff8e1;color:#7a5b00;font-size:12px;box-shadow:none;text-align:center;max-width:90%}
+  .m .quien{font-size:11.5px;font-weight:700;color:var(--verde);margin-bottom:2px}
+  .m img{max-width:260px;max-height:300px;border-radius:6px;display:block;cursor:pointer}
+  .m audio{max-width:250px}
+  .m a{color:#0b6bcb}
+  .aviso-ventana{background:#fdecea;color:var(--rojo);padding:9px 14px;font-size:13px;border-top:1px solid #f5c6c0}
+  .escribir{display:flex;gap:8px;padding:10px;background:#f0f2f5;align-items:flex-end;position:relative}
+  .escribir textarea{flex:1;resize:none;border:0;border-radius:10px;padding:10px 12px;max-height:140px;min-height:42px;outline:none}
+  .escribir .btn{height:42px}
+  #rapidas{position:absolute;bottom:60px;left:10px;background:#fff;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:460px;max-height:300px;overflow-y:auto;z-index:5}
+  #rapidas div{padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13px}
+  #rapidas div:hover{background:var(--claro)}
+  #rapidas .tit{font-size:11px;color:var(--suave);cursor:default;background:#fafafa;font-weight:600}
+  .sin-chat{flex:1;display:grid;place-items:center;color:var(--suave);text-align:center;padding:20px}
+
+  /* Admin */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:grid;place-items:center;z-index:20;padding:16px}
+  .modal .caja{background:#fff;border-radius:12px;padding:20px;width:100%;max-width:980px;max-height:90vh;overflow:auto}
+  .modal h2{font-size:17px;margin-bottom:4px}
+  .modal p{color:var(--suave);font-size:13px;margin-bottom:12px}
+  .modal table{width:100%;border-collapse:collapse;font-size:13px}
+  .modal th,.modal td{border-bottom:1px solid var(--borde);padding:7px 5px;text-align:left;vertical-align:top}
+  .modal td input[type=text]{padding:5px 7px;border:1px solid var(--borde);border-radius:6px;width:130px}
+  .modal .secs label{display:inline-flex;gap:3px;align-items:center;margin:0 8px 4px 0;white-space:nowrap}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:8px;z-index:30;max-width:90%;font-size:13px}
+  #toast.error{background:var(--rojo)}
+
+  @media (max-width:760px){
+    .lista{width:100%}
+    .app.viendo .lista{display:none}
+    .app:not(.viendo) .chat{display:none}
+    .volver{display:inline-block}
+    #mensajes{padding:12px}
+    .m{max-width:88%}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="vLogin" class="centro oculto">
+  <div class="tarjeta">
+    <h1>Bandeja de WhatsApp</h1>
+    <p>Comuna de Alcorta · acceso para empleados</p>
+    <div id="campoNombre" class="oculto"><label>Nombre (como lo va a ver el vecino)</label><input id="lNombre" placeholder="Ej: Melisa"></div>
+    <label>Email</label><input id="lEmail" type="email" autocomplete="username">
+    <label>Contraseña</label><input id="lPass" type="password" autocomplete="current-password">
+    <div class="acciones">
+      <button class="btn prim" id="bIngresar">Ingresar</button>
+      <button class="btn" id="bCrear">Crear cuenta</button>
+    </div>
+    <button class="link" id="bOlvide">¿Olvidaste la contraseña?</button>
+  </div>
+</div>
+
+<!-- PENDIENTE -->
+<div id="vPendiente" class="centro oculto">
+  <div class="tarjeta">
+    <h1>Usuario pendiente ⏳</h1>
+    <p>Tu cuenta fue creada. La administradora tiene que habilitarte y asignarte los sectores. Esta pantalla se actualiza sola.</p>
+    <button class="btn" onclick="salir()">Salir</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="vApp" class="app oculto">
+  <div class="top">
+    <h1>💬 Bandeja WhatsApp</h1>
+    <div class="yo"><b id="yoNombre"></b><br><span id="yoSectores"></span></div>
+    <button class="btn" id="bNotif" title="Activar avisos">🔔</button>
+    <button class="btn oculto" id="bAdmin">👥 Usuarios</button>
+    <button class="btn" onclick="salir()">Salir</button>
+  </div>
+  <div class="cuerpo">
+    <div class="lista">
+      <div class="tabs">
+        <button data-tab="nuevo" class="act">Nuevos<span class="num oculto" id="nNuevo"></span></button>
+        <button data-tab="en_atencion">En atención<span class="num oculto" id="nAtencion"></span></button>
+        <button data-tab="resuelto">Resueltos</button>
+      </div>
+      <div class="filtros">
+        <input id="buscar" placeholder="🔍 Buscar nombre o teléfono">
+        <select id="filtroSector"></select>
+      </div>
+      <div id="convs"></div>
+    </div>
+    <div class="chat">
+      <div id="sinChat" class="sin-chat">Elegí una conversación de la lista</div>
+      <div id="conChat" class="oculto" style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <div class="chat-top">
+          <button class="btn volver" onclick="cerrarChat()">←</button>
+          <div class="info"><b id="cNombre"></b><span id="cDatos"></span></div>
+          <a class="btn" id="cLlamar" title="Llamar">📞</a>
+          <select id="cDerivar"></select>
+          <button class="btn" id="cTomar">Tomar</button>
+          <button class="btn prim" id="cResolver">✔ Resolver</button>
+          <button class="btn oculto" id="cReabrir">Reabrir</button>
+        </div>
+        <div id="mensajes"></div>
+        <div id="avisoVentana" class="aviso-ventana oculto"></div>
+        <div class="escribir">
+          <div id="rapidas" class="oculto"></div>
+          <button class="btn" id="bRapidas" title="Respuestas rápidas">⚡</button>
+          <textarea id="texto" rows="1" placeholder="Escribí una respuesta… (Enter envía, Shift+Enter nueva línea)"></textarea>
+          <button class="btn prim" id="bEnviar">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="vAdmin" class="modal oculto">
+  <div class="caja">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>👥 Usuarios y sectores</h2>
+      <button class="btn" onclick="$('vAdmin').classList.add('oculto')">Cerrar</button>
+    </div>
+    <p>Cada empleado crea su cuenta desde la pantalla de ingreso. Acá lo habilitás, le ponés el nombre que verá el vecino y le marcás los sectores que atiende. Los cambios se guardan solos.</p>
+    <table><thead><tr><th>Nombre</th><th>Email</th><th>Habilitado</th><th>Admin</th><th>Sectores</th></tr></thead><tbody id="tUsuarios"></tbody></table>
+  </div>
+</div>
+
+<div id="toast" class="oculto"></div>
+
+<script>
+/* ====================== CONFIGURACIÓN — completar ====================== */
+const CONFIG = {
+  firebase: {
+    apiKey: "AIzaSyAErXWspdfZAKEJLyCYpJRgtZKFGD7CrqU",
+    authDomain: "comuna-whatsapp.firebaseapp.com",
+    databaseURL: "https://comuna-whatsapp-default-rtdb.firebaseio.com",
+    projectId: "comuna-whatsapp"
+  },
+  worker: "https://small-band-df9bwhatsapp-comuna.catastroalcorta.workers.dev"   // URL del Cloudflare Worker, sin barra al final
+};
+
+// Mismos "id" que en worker.js
+const SECTORES = [
+  { id: "reclamos",    titulo: "Reclamos / Obras públicas", corto: "Reclamos",   color: "#fde2e1" },
+  { id: "patente",     titulo: "Patente",                   corto: "Patente",    color: "#e0ecff" },
+  { id: "licencia",    titulo: "Licencia de conducir",      corto: "Licencia",   color: "#e9e3ff" },
+  { id: "tasas",       titulo: "Tasas, Catastro y Cloacas", corto: "Tasas",      color: "#dcf5e6" },
+  { id: "cementerio",  titulo: "Cementerio, Habilitaciones y DREI", corto: "Cementerio/DREI", color: "#f3e8d8" },
+  { id: "edificacion", titulo: "Edificación, planos y N° domiciliario", corto: "Edificación", color: "#fff1c9" },
+  { id: "multas",      titulo: "Multas",                    corto: "Multas",     color: "#ffe2f0" },
+  { id: "otros",       titulo: "Mesa de entradas (otras consultas)", corto: "Otras", color: "#eceff1" }
+];
+
+// Respuestas rápidas (botón ⚡). "general" aparece en todos los sectores.
+const RAPIDAS = {
+  general: [
+    "¡Hola! Ya estamos viendo tu consulta, en un momento te respondemos.",
+    "¿Me podrías indicar tu nombre completo y DNI?",
+    "Podés acercarte a la Comuna de lunes a viernes de 7 a 13 hs.",
+    "¿Necesitás algo más?"
+  ],
+  reclamos: [
+    "Gracias por avisar. Ya registramos el reclamo y lo pasamos a la cuadrilla.",
+    "¿Nos podrías mandar una foto y la dirección exacta?",
+    "El trabajo ya fue realizado. ¡Gracias por avisarnos!"
+  ],
+  patente: ["¿Me indicás el dominio (patente) del vehículo?"],
+  licencia: [
+    "Para sacar turno necesitamos tu nombre completo, DNI y si es primera licencia o renovación.",
+    "Te esperamos el día del turno con DNI y la licencia anterior (si es renovación)."
+  ],
+  tasas: [
+    "¿Me indicás el número de partida o la dirección del inmueble?",
+    "Te paso el detalle de deuda y los medios de pago."
+  ],
+  cementerio: ["¿Me indicás el nombre de la persona fallecida y la ubicación del nicho?"],
+  edificacion: ["¿Me indicás la dirección y el número de partida del inmueble?"],
+  multas: ["¿Me indicás el número de acta o el dominio del vehículo?"],
+  otros: ["Gracias, ya derivamos tu consulta al sector que corresponde."]
+};
+
+const AVISO_DERIVADO = (s) => `Tu consulta fue derivada a *${s.titulo}*. En breve te responden 🙌`;
+const AVISO_CIERRE = "✅ Damos por resuelta tu consulta. Si necesitás algo más, escribinos cuando quieras. ¡Gracias por comunicarte con la Comuna de Alcorta!";
+
+/* ====================== APP ====================== */
+firebase.initializeApp(CONFIG.firebase);
+const auth = firebase.auth();
+const db = firebase.database();
+const $ = (id) => document.getElementById(id);
+
+let perfil = null, uid = null, convs = {}, usuarios = {}, actual = null;
+let tab = "nuevo", appIniciada = false, refMensajes = null, mensajesActuales = [];
+const vistos = {}; let primeraCarga = true;
+
+const sec = (id) => SECTORES.find((s) => s.id === id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const formatoWA = (s) => esc(s)
+  .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+  .replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/(^|\s)_([^_\n]+)_/g, "$1<i>$2</i>");
+const hora = (ts) => {
+  if (!ts) return "";
+  const d = new Date(ts), hoy = new Date();
+  const hm = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === hoy.toDateString() ? hm : d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) + " " + hm;
+};
+const telFmt = (t) => "+" + t;
+function horasRestantes(c) { return 24 - (Date.now() - (c.ultimoVecino || 0)) / 3600e3; }
+function toast(msg, error) {
+  const t = $("toast"); t.textContent = msg; t.className = error ? "error" : "";
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("oculto"), error ? 7000 : 3000);
+}
+function mostrar(vista) { ["vLogin", "vPendiente", "vApp"].forEach((v) => $(v).classList.toggle("oculto", v !== vista)); }
+
+/* ---------- Ingreso ---------- */
+let creando = false;
+$("bIngresar").onclick = async () => {
+  if (creando) { creando = false; $("campoNombre").classList.add("oculto"); $("bCrear").textContent = "Crear cuenta"; }
+  try { await auth.signInWithEmailAndPassword($("lEmail").value.trim(), $("lPass").value); }
+  catch (e) { toast(traducirError(e), true); }
+};
+$("bCrear").onclick = async () => {
+  if (!creando) { creando = true; $("campoNombre").classList.remove("oculto"); $("bCrear").textContent = "Confirmar cuenta nueva"; $("lNombre").focus(); return; }
+  if (!$("lNombre").value.trim()) return toast("Poné tu nombre", true);
+  try { await auth.createUserWithEmailAndPassword($("lEmail").value.trim(), $("lPass").value); }
+  catch (e) { toast(traducirError(e), true); }
+};
+$("bOlvide").onclick = async () => {
+  const email = $("lEmail").value.trim();
+  if (!email) return toast("Escribí tu email arriba", true);
+  try { await auth.sendPasswordResetEmail(email); toast("Te mandamos un email para cambiar la contraseña"); }
+  catch (e) { toast(traducirError(e), true); }
+};
+$("lPass").addEventListener("keydown", (e) => { if (e.key === "Enter") $(creando ? "bCrear" : "bIngresar").click(); });
+function traducirError(e) {
+  const m = {
+    "auth/invalid-credential": "Email o contraseña incorrectos", "auth/wrong-password": "Contraseña incorrecta",
+    "auth/user-not-found": "No existe un usuario con ese email", "auth/email-already-in-use": "Ese email ya tiene cuenta: tocá Ingresar",
+    "auth/weak-password": "La contraseña debe tener al menos 6 caracteres", "auth/invalid-email": "Email inválido"
+  };
+  return m[e.code] || e.message;
+}
+function salir() { auth.signOut(); location.reload(); }
+
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return mostrar("vLogin");
+  uid = user.uid;
+  const ref = db.ref("usuarios/" + uid);
+  const snap = await ref.once("value");
+  if (!snap.exists()) {
+    await ref.set({ email: user.email, nombre: $("lNombre").value.trim() || user.email.split("@")[0], activo: false, admin: false, creado: firebase.database.ServerValue.TIMESTAMP });
+  }
+  ref.on("value", (s) => {
+    perfil = s.val() || {};
+    if (!perfil.activo) return mostrar("vPendiente");
+    mostrar("vApp");
+    $("yoNombre").textContent = perfil.nombre;
+    $("yoSectores").textContent = perfil.admin ? "Administradora · todos los sectores" : misSectores().map((x) => sec(x)?.corto).join(" · ") || "Sin sectores asignados";
+    $("bAdmin").classList.toggle("oculto", !perfil.admin);
+    llenarFiltro();
+    if (!appIniciada) iniciarApp();
+    renderLista(); if (actual) renderChat();
+  });
+});
+
+/* ---------- Datos ---------- */
+function misSectores() { return Object.keys(perfil?.sectores || {}).filter((k) => perfil.sectores[k]); }
+function puedoVer(c) { return perfil.admin || (c.sector && perfil.sectores?.[c.sector]); }
+
+function iniciarApp() {
+  appIniciada = true;
+  db.ref("conversaciones").on("value", (s) => {
+    const nuevas = s.val() || {};
+    for (const [tel, c] of Object.entries(nuevas)) {
+      if (!primeraCarga && puedoVer(c) && c.estado !== "menu" && (c.ultimoVecino || 0) > (vistos[tel] || 0) && (tel !== actual || document.hidden)) avisar(c);
+      vistos[tel] = c.ultimoVecino || 0;
+    }
+    primeraCarga = false;
+    convs = nuevas;
+    renderLista();
+    if (actual) renderChatTop();
+  }, (e) => toast("Sin permiso para leer: " + e.message, true));
+  setInterval(() => { renderLista(); if (actual) renderChatTop(); }, 60000);
+}
+
+function llenarFiltro() {
+  const opciones = perfil.admin ? SECTORES.map((s) => s.id) : misSectores();
+  const actualVal = $("filtroSector").value;
+  $("filtroSector").innerHTML = `<option value="">Todos mis sectores</option>` + opciones.map((id) => `<option value="${id}">${esc(sec(id)?.corto || id)}</option>`).join("") + (perfil.admin ? `<option value="__menu">Eligiendo sector</option>` : "");
+  $("filtroSector").value = actualVal;
+  $("cDerivar").innerHTML = `<option value="">↪ Derivar a…</option>` + SECTORES.map((s) => `<option value="${s.id}">${esc(s.titulo)}</option>`).join("");
+}
+
+/* ---------- Lista ---------- */
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+  tab = b.dataset.tab;
+  document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("act", x === b));
+  renderLista();
+});
+$("buscar").oninput = renderLista;
+$("filtroSector").onchange = renderLista;
+
+function renderLista() {
+  if (!perfil) return;
+  const q = $("buscar").value.toLowerCase().trim();
+  const f = $("filtroSector").value;
+  const todas = Object.entries(convs).map(([tel, c]) => ({ tel, ...c })).filter(puedoVer);
+  const cuenta = (e) => todas.filter((c) => c.estado === e || (e === "nuevo" && c.estado === "menu" && perfil.admin)).length;
+  const nN = cuenta("nuevo"), nA = todas.filter((c) => c.estado === "en_atencion" && c.noLeidos > 0).length;
+  $("nNuevo").textContent = nN; $("nNuevo").classList.toggle("oculto", !nN);
+  $("nAtencion").textContent = nA; $("nAtencion").classList.toggle("oculto", !nA);
+  const sinLeer = todas.reduce((a, c) => a + (c.estado !== "resuelto" && c.estado !== "menu" ? (c.noLeidos || 0) : 0), 0);
+  document.title = (sinLeer ? `(${sinLeer}) ` : "") + "Bandeja WhatsApp · Comuna de Alcorta";
+
+  let lista = todas.filter((c) => {
+    if (tab === "nuevo" ? !(c.estado === "nuevo" || c.estado === "menu") : c.estado !== tab) return false;
+    if (f === "__menu") { if (c.estado !== "menu") return false; }
+    else if (f && c.sector !== f) return false;
+    if (q && !((c.nombre || "").toLowerCase().includes(q) || c.tel.includes(q.replace(/\D/g, "") || "#"))) return false;
+    return true;
+  }).sort((a, b) => (b.ultimo || 0) - (a.ultimo || 0));
+  if (tab === "resuelto") lista = lista.slice(0, 150);
+
+  $("convs").innerHTML = lista.length ? lista.map((c) => {
+    const s = sec(c.sector);
+    const h = horasRestantes(c);
+    const venc = c.estado === "resuelto" ? "" :
+      h <= 0 ? `<span class="vence vencida">⛔ Ventana vencida</span>` :
+      h < 4 ? `<span class="vence alerta">⏳ Quedan ${Math.max(1, Math.floor(h))} h</span>` :
+      `<span class="vence">⏱ ${Math.floor(h)} h</span>`;
+    return `<div class="conv ${c.tel === actual ? "sel" : ""}" onclick="abrir('${c.tel}')">
+      <div class="nom">${esc(c.nombre || telFmt(c.tel))}</div><div class="hora">${hora(c.ultimo)}</div>
+      <div class="ult">${esc(c.ultimoTexto || "")}</div>${c.noLeidos && c.estado !== "menu" ? `<span class="badge">${c.noLeidos}</span>` : "<span></span>"}
+      <div class="meta">${c.estado === "menu" ? `<span class="chip">Eligiendo sector…</span>` : s ? `<span class="chip" style="background:${s.color}">${esc(s.corto)}</span>` : ""}
+        ${c.asignado ? `<span class="chip">👤 ${esc(c.asignado)}</span>` : ""}${venc}</div>
+    </div>`;
+  }).join("") : `<div class="vacio">${tab === "nuevo" ? "No hay consultas nuevas 🎉" : "No hay conversaciones"}</div>`;
+}
+
+/* ---------- Chat ---------- */
+function abrir(tel) {
+  actual = tel;
+  $("vApp").classList.add("viendo");
+  $("sinChat").classList.add("oculto"); $("conChat").classList.remove("oculto");
+  $("rapidas").classList.add("oculto");
+  if (refMensajes) refMensajes.off();
+  $("mensajes").innerHTML = `<div class="vacio">Cargando…</div>`;
+  refMensajes = db.ref("mensajes/" + tel).orderByChild("ts").limitToLast(300);
+  refMensajes.on("value", (s) => {
+    mensajesActuales = []; s.forEach((ch) => { mensajesActuales.push(ch.val()); });
+    renderMensajes();
+    marcarLeido();
+  });
+  renderLista(); renderChatTop();
+  setTimeout(() => $("texto").focus(), 50);
+}
+function cerrarChat() {
+  actual = null; if (refMensajes) refMensajes.off();
+  $("vApp").classList.remove("viendo");
+  $("sinChat").classList.remove("oculto"); $("conChat").classList.add("oculto");
+  renderLista();
+}
+function marcarLeido() {
+  const c = convs[actual];
+  if (c && c.noLeidos && !document.hidden) db.ref("conversaciones/" + actual + "/noLeidos").set(0);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && actual) marcarLeido(); });
+
+function renderChat() { renderChatTop(); renderMensajes(); }
+function renderChatTop() {
+  const c = convs[actual]; if (!c) return;
+  const s = sec(c.sector);
+  $("cNombre").textContent = c.nombre || telFmt(actual);
+  $("cDatos").textContent = `${telFmt(actual)} · ${c.estado === "menu" ? "eligiendo sector" : s ? s.titulo : "sin sector"}${c.asignado ? " · atiende " + c.asignado : ""}`;
+  $("cLlamar").href = "tel:+" + actual;
+  $("cResolver").classList.toggle("oculto", c.estado === "resuelto");
+  $("cReabrir").classList.toggle("oculto", c.estado !== "resuelto");
+  $("cTomar").classList.toggle("oculto", c.estado === "resuelto" || c.asignado === perfil.nombre);
+  const h = horasRestantes(c);
+  const vencida = h <= 0;
+  $("avisoVentana").classList.toggle("oculto", !vencida && h >= 4);
+  $("avisoVentana").innerHTML = vencida
+    ? "⛔ Pasaron más de 24 hs desde el último mensaje del vecino. WhatsApp no permite responderle gratis. Llamalo por teléfono o pedile que vuelva a escribir."
+    : `⏳ Quedan ${Math.floor(h)} h ${Math.floor((h % 1) * 60)} min para responder gratis.`;
+  $("avisoVentana").style.background = vencida ? "" : "#fff4e5";
+  $("avisoVentana").style.color = vencida ? "" : "#9a5b00";
+  $("texto").disabled = $("bEnviar").disabled = vencida;
+}
+
+async function renderMensajes() {
+  let token = "";
+  if (mensajesActuales.some((m) => m.mediaId)) token = await auth.currentUser.getIdToken();
+  const mediaURL = (id) => `${CONFIG.worker}/media/${id}?t=${encodeURIComponent(token)}`;
+  const abajo = $("mensajes").scrollHeight - $("mensajes").scrollTop - $("mensajes").clientHeight < 80;
+  $("mensajes").innerHTML = mensajesActuales.map((m) => {
+    let contenido = "";
+    if (m.mediaId) {
+      const u = mediaURL(m.mediaId);
+      if (m.tipo === "image" || m.tipo === "sticker") contenido = `<img src="${u}" loading="lazy" onclick="window.open(this.src)">`;
+      else if (m.tipo === "audio") contenido = `<audio controls preload="none" src="${u}"></audio>`;
+      else if (m.tipo === "video") contenido = `<video controls preload="none" src="${u}" style="max-width:260px"></video>`;
+      else contenido = `<a href="${u}" target="_blank">📄 ${esc(m.archivo || "Abrir archivo")}</a>`;
+      const leyenda = m.texto && !/^\[/.test(m.texto) && !m.texto.startsWith("📄") ? `<div>${formatoWA(m.texto)}</div>` : "";
+      contenido += leyenda;
+    } else contenido = formatoWA(m.texto);
+    const quien = m.de === "empleado" ? `<div class="quien">${esc(m.empleado || "")}</div>` : m.de === "bot" ? `<div class="quien" style="color:#64748b">🤖 Automático</div>` : "";
+    return `<div class="m ${m.de}">${quien}${contenido}<div class="pie">${hora(m.ts)}</div></div>`;
+  }).join("") || `<div class="vacio">Sin mensajes</div>`;
+  if (abajo || !renderMensajes._tel || renderMensajes._tel !== actual) $("mensajes").scrollTop = $("mensajes").scrollHeight;
+  renderMensajes._tel = actual;
+}
+
+/* ---------- Enviar ---------- */
+async function llamarWorker(to, texto, tipo) {
+  const token = await auth.currentUser.getIdToken();
+  const r = await fetch(CONFIG.worker + "/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ to, texto, tipo })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.ok) throw new Error(d.error || "No se pudo enviar (" + r.status + ")");
+}
+async function enviar() {
+  const t = $("texto").value.trim();
+  if (!t || !actual) return;
+  $("bEnviar").disabled = true;
+  try { await llamarWorker(actual, t, "texto"); $("texto").value = ""; autoAlto(); }
+  catch (e) { toast(e.message, true); }
+  finally { $("bEnviar").disabled = horasRestantes(convs[actual] || {}) <= 0; $("texto").focus(); }
+}
+$("bEnviar").onclick = enviar;
+$("texto").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } });
+function autoAlto() { const t = $("texto"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 140) + "px"; }
+$("texto").addEventListener("input", autoAlto);
+
+/* ---------- Respuestas rápidas ---------- */
+$("bRapidas").onclick = () => {
+  const c = convs[actual] || {};
+  const grupos = [["General", RAPIDAS.general], [sec(c.sector)?.corto || "", RAPIDAS[c.sector] || []]].filter((g) => g[1].length);
+  $("rapidas").innerHTML = grupos.map(([tit, l]) => `<div class="tit">${esc(tit)}</div>` + l.map((r) => `<div data-r="${esc(r)}">${esc(r)}</div>`).join("")).join("");
+  $("rapidas").classList.toggle("oculto");
+};
+$("rapidas").onclick = (e) => {
+  const r = e.target.dataset.r; if (!r) return;
+  $("texto").value = r; autoAlto(); $("rapidas").classList.add("oculto"); $("texto").focus();
+};
+
+/* ---------- Acciones ---------- */
+function notaSistema(tel, texto) { return db.ref("mensajes/" + tel).push({ de: "sistema", texto, ts: firebase.database.ServerValue.TIMESTAMP }); }
+
+$("cTomar").onclick = async () => {
+  await db.ref("conversaciones/" + actual).update({ asignado: perfil.nombre, estado: "en_atencion" });
+  notaSistema(actual, `${perfil.nombre} tomó la conversación`);
+};
+
+$("cDerivar").onchange = async (e) => {
+  const destino = sec(e.target.value); e.target.value = "";
+  const c = convs[actual]; if (!destino || !c) return;
+  if (destino.id === c.sector) return toast("Ya está en ese sector");
+  if (!confirm(`¿Derivar esta conversación a "${destino.titulo}"?\nSe le avisa al vecino por WhatsApp.`)) return;
+  const tel = actual;
+  try { if (horasRestantes(c) > 0) await llamarWorker(tel, AVISO_DERIVADO(destino), "aviso"); } catch (err) { toast("No se pudo avisar al vecino: " + err.message, true); }
+  await db.ref("conversaciones/" + tel).update({ sector: destino.id, estado: "nuevo", asignado: null, noLeidos: Math.max(1, c.noLeidos || 0) });
+  await notaSistema(tel, `${perfil.nombre} derivó la conversación de ${sec(c.sector)?.titulo || "sin sector"} a ${destino.titulo}`);
+  toast("Derivada a " + destino.titulo);
+  if (!puedoVer({ sector: destino.id })) cerrarChat();
+};
+
+$("cResolver").onclick = async () => {
+  const c = convs[actual]; if (!c) return;
+  const avisar = horasRestantes(c) > 0;
+  if (!confirm("¿Marcar como resuelta?" + (avisar ? "\nSe le envía al vecino un mensaje de cierre." : ""))) return;
+  const tel = actual;
+  try { if (avisar) await llamarWorker(tel, AVISO_CIERRE, "aviso"); } catch (err) { toast("No se pudo enviar el cierre: " + err.message, true); }
+  await db.ref("conversaciones/" + tel).update({ estado: "resuelto", resueltoTs: firebase.database.ServerValue.TIMESTAMP, resueltoPor: perfil.nombre, noLeidos: 0 });
+  await notaSistema(tel, `✔ Resuelta por ${perfil.nombre}`);
+  toast("Conversación resuelta");
+  cerrarChat();
+};
+
+$("cReabrir").onclick = async () => {
+  await db.ref("conversaciones/" + actual).update({ estado: "en_atencion", asignado: perfil.nombre });
+  notaSistema(actual, `${perfil.nombre} reabrió la conversación`);
+};
+
+/* ---------- Avisos ---------- */
+$("bNotif").onclick = async () => {
+  if (!("Notification" in window)) return toast("Este navegador no permite avisos", true);
+  const p = await Notification.requestPermission();
+  toast(p === "granted" ? "Avisos activados 🔔" : "Avisos bloqueados en el navegador", p !== "granted");
+  beep();
+};
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination); o.frequency.value = 880; g.gain.value = 0.08;
+    o.start(); o.stop(ctx.currentTime + 0.18);
+  } catch (e) {}
+}
+function avisar(c) {
+  beep();
+  if ("Notification" in window && Notification.permission === "granted") {
+    const n = new Notification(`💬 ${c.nombre || telFmt(c.telefono)} · ${sec(c.sector)?.corto || ""}`, { body: c.ultimoTexto || "", tag: c.telefono });
+    n.onclick = () => { window.focus(); abrir(c.telefono); n.close(); };
+  }
+}
+
+/* ---------- Administración de usuarios ---------- */
+$("bAdmin").onclick = () => {
+  $("vAdmin").classList.remove("oculto");
+  db.ref("usuarios").on("value", (s) => { usuarios = s.val() || {}; renderUsuarios(); });
+};
+function renderUsuarios() {
+  $("tUsuarios").innerHTML = Object.entries(usuarios).sort((a, b) => (a[1].nombre || "").localeCompare(b[1].nombre || "")).map(([id, u]) => `
+    <tr>
+      <td><input type="text" value="${esc(u.nombre)}" onchange="actualizarUsuario('${id}', {nombre: this.value.trim()})"></td>
+      <td>${esc(u.email)}</td>
+      <td><input type="checkbox" ${u.activo ? "checked" : ""} onchange="actualizarUsuario('${id}', {activo: this.checked})"></td>
+      <td><input type="checkbox" ${u.admin ? "checked" : ""} ${id === uid ? "disabled" : ""} onchange="actualizarUsuario('${id}', {admin: this.checked})"></td>
+      <td class="secs">${SECTORES.map((s) => `<label><input type="checkbox" ${u.sectores?.[s.id] ? "checked" : ""} onchange="actualizarUsuario('${id}', {'sectores/${s.id}': this.checked || null})">${esc(s.corto)}</label>`).join("")}</td>
+    </tr>`).join("");
+}
+async function actualizarUsuario(id, datos) {
+  try { await db.ref("usuarios/" + id).update(datos); toast("Guardado"); }
+  catch (e) { toast("No se pudo guardar: " + e.message, true); }
+}
+</script>
+</body>
+</html>
