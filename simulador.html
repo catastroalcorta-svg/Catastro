@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de vecino · WhatsApp Comuna de Alcorta</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#d9dbd5;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:20px;gap:24px;flex-wrap:wrap}
+  .ayuda{max-width:340px;background:#fff;border-radius:12px;padding:18px;font-size:14px;line-height:1.5;color:#333}
+  .ayuda h1{font-size:17px;margin-bottom:8px;color:#075e54}
+  .ayuda label{display:block;font-size:12px;color:#666;margin:10px 0 3px}
+  .ayuda input{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font-size:14px}
+  .ayuda button{margin-top:12px;padding:8px 12px;border:0;border-radius:8px;background:#075e54;color:#fff;cursor:pointer;font-size:14px}
+  .ayuda .nota{font-size:12px;color:#777;margin-top:10px}
+  .tel{width:380px;height:760px;max-height:calc(100vh - 40px);background:#efeae2;border-radius:28px;border:10px solid #111;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .cab{background:#075e54;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}
+  .cab .av{width:38px;height:38px;border-radius:50%;background:#fff;color:#075e54;display:grid;place-items:center;font-weight:800}
+  .cab b{display:block;font-size:15px}.cab span{font-size:12px;opacity:.8}
+  #chat{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
+  .m{max-width:82%;padding:7px 9px 4px;border-radius:8px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;box-shadow:0 1px 1px rgba(0,0,0,.1)}
+  .m .h{font-size:10px;color:#777;text-align:right;margin-top:2px}
+  .yo{background:#d9fdd3;align-self:flex-end}
+  .ellos{background:#fff;align-self:flex-start}
+  .sis{align-self:center;background:#fff8c5;font-size:12px;color:#665}
+  .lista{display:flex;flex-direction:column;gap:4px;margin-top:8px;border-top:1px solid #eee;padding-top:6px}
+  .lista button{background:none;border:0;color:#027eb5;font-size:14px;padding:6px 4px;text-align:left;cursor:pointer;border-radius:6px}
+  .lista button:hover{background:#f0f7fb}
+  .lista small{display:block;color:#888;font-size:11px}
+  form{display:flex;gap:6px;padding:8px;background:#f0f0f0}
+  form input{flex:1;border:0;border-radius:20px;padding:10px 14px;font-size:14px;outline:none}
+  form button{width:42px;height:42px;border-radius:50%;border:0;background:#075e54;color:#fff;font-size:17px;cursor:pointer}
+  #estado{font-size:12px;color:#b00;padding:0 12px 6px;background:#f0f0f0}
+</style>
+</head>
+<body>
+
+<div class="ayuda">
+  <h1>📱 Simulador de vecino</h1>
+  <p>Hace de "celular de un vecino" para probar el bot y el panel <b>sin pasar por WhatsApp</b>. Los mensajes aparecen en la bandeja de los empleados como una consulta más.</p>
+  <label>Clave (la de WA_VERIFY_TOKEN)</label>
+  <input id="clave" type="password" placeholder="alcorta2026">
+  <label>Número del vecino de prueba (empieza con 999)</label>
+  <input id="tel" value="9990000000001">
+  <label>Nombre del vecino</label>
+  <input id="nombre" value="Vecino de prueba">
+  <button onclick="nuevoVecino()">🔄 Otro vecino</button>
+  <p class="nota">Cada número 999… es un vecino distinto. Las respuestas de los empleados aparecen solas en este "celular" a los pocos segundos.</p>
+</div>
+
+<div class="tel">
+  <div class="cab"><div class="av">CA</div><div><b>Comuna de Alcorta</b><span>Simulación · no es WhatsApp real</span></div></div>
+  <div id="chat"></div>
+  <div id="estado"></div>
+  <form id="f" autocomplete="off">
+    <input id="txt" placeholder="Escribí como si fueras un vecino…">
+    <button>➤</button>
+  </form>
+</div>
+
+<script>
+const WORKER = "https://small-band-df9bwhatsapp-comuna.catastroalcorta.workers.dev";
+// Mismos id y títulos que en worker.js
+const SECTORES = [
+  ["reclamos", "Reclamos / Obras", "Obras públicas: calles, luz, árboles, limpieza"],
+  ["patente", "Patente", "Patente automotor: deuda, pagos, altas y bajas"],
+  ["licencia", "Licencia de conducir", "Turnos, requisitos, primera licencia y renovaciones"],
+  ["tasas", "Tasas, Catastro, Cloacas", "Tasa urbana y rural, libre de deuda, catastro, cloacas"],
+  ["cementerio", "Cementerio y comercios", "Cementerio, habilitaciones comerciales y DREI"],
+  ["edificacion", "Obras privadas / planos", "Permiso de edificación, visado de planos, N° domiciliario"],
+  ["multas", "Multas", "Consultas y pago de multas de tránsito"],
+  ["otros", "Otra consulta", "Si no sabés a qué sector corresponde"]
+];
+const $ = (id) => document.getElementById(id);
+const guardar = (k, v) => { try { localStorage.setItem("sim_" + k, v); } catch (e) {} };
+const leer = (k) => { try { return localStorage.getItem("sim_" + k); } catch (e) { return null; } };
+["clave", "tel", "nombre"].forEach((k) => { const v = leer(k); if (v) $(k).value = v; $(k).onchange = () => { guardar(k, $(k).value); cargar(); }; });
+
+const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (s) => esc(s).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>');
+const hora = (ts) => new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+let ultimo = "";
+
+function params(extra) {
+  return new URLSearchParams({ clave: $("clave").value.trim(), tel: $("tel").value.replace(/\D/g, ""), nombre: $("nombre").value, ...extra }).toString();
+}
+async function llamar(ruta, extra) {
+  const r = await fetch(`${WORKER}${ruta}?${params(extra)}`);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.ok) throw new Error(d.error || "Error " + r.status);
+  return d;
+}
+
+async function cargar() {
+  if (!$("clave").value.trim()) { $("estado").textContent = "Escribí la clave a la izquierda para empezar."; return; }
+  try {
+    const d = await llamar("/simular/mensajes");
+    $("estado").textContent = "";
+    const firma = JSON.stringify(d.mensajes.map((m) => m.ts));
+    if (firma === ultimo) return;
+    ultimo = firma;
+    $("chat").innerHTML = d.mensajes.map((m) => {
+      if (m.de === "sistema") return `<div class="m sis">${esc(m.texto)}</div>`;
+      const yo = m.de === "vecino";
+      let cuerpo = m.de === "empleado" ? `<b>${esc(m.empleado)}</b>\n${fmt(m.texto)}` : fmt(m.texto.replace("\n[Menú de sectores]", ""));
+      if (m.texto.includes("[Menú de sectores]")) {
+        cuerpo += `<div class="lista">${SECTORES.map(([id, t, d]) => `<button onclick="elegir('${id}','${esc(t)}')">${esc(t)}<small>${esc(d)}</small></button>`).join("")}</div>`;
+      }
+      return `<div class="m ${yo ? "yo" : "ellos"}">${cuerpo}<div class="h">${hora(m.ts)}</div></div>`;
+    }).join("");
+    $("chat").scrollTop = $("chat").scrollHeight;
+  } catch (e) { $("estado").textContent = "⚠️ " + e.message; }
+}
+
+async function enviar(extra) {
+  try { await llamar("/simular", extra); ultimo = ""; await cargar(); }
+  catch (e) { $("estado").textContent = "⚠️ " + e.message; }
+}
+function elegir(id) { enviar({ opcion: id }); }
+$("f").onsubmit = (e) => { e.preventDefault(); const t = $("txt").value.trim(); if (!t) return; $("txt").value = ""; enviar({ texto: t }); };
+function nuevoVecino() {
+  const n = "999" + String(Date.now()).slice(-10);
+  $("tel").value = n; guardar("tel", n);
+  const nombres = ["Juan Pérez", "María Gómez", "Carlos Díaz", "Laura Fernández", "Pedro Ruiz", "Ana Sosa"];
+  $("nombre").value = nombres[Math.floor(Math.random() * nombres.length)]; guardar("nombre", $("nombre").value);
+  ultimo = ""; $("chat").innerHTML = ""; cargar();
+}
+cargar();
+setInterval(cargar, 3000);
+</script>
+</body>
+</html>
